@@ -746,7 +746,7 @@ func isValidEmailBatchingInterval(emailInterval string) bool {
 }
 
 // validateGuestRoles checks if the user has guest roles consistently across system, team, and channel levels.
-// at this point we assume that the user has a valid role scheme.
+// At this point, we assume that the user has a valid role scheme.
 func validateGuestRoles(data UserImportData) *model.AppError {
 	if data.Roles == nil {
 		return nil
@@ -759,24 +759,20 @@ func validateGuestRoles(data UserImportData) *model.AppError {
 	}
 
 	var isTeamGuest, isChannelGuest bool
-	var hasTeams, hasChannels bool
+	var hasChannels bool // hasChannels indicates if the user has any channels within their teams
 
-	// counters for guest roles for teams and channels
 	var teamGuestCount, channelGuestCount int
 	var totalTeams, totalChannels int
 
 	totalTeams = len(*data.Teams)
-	hasTeams = totalTeams > 0
 	for _, team := range *data.Teams {
 		if team.Roles != nil && model.IsInRole(*team.Roles, model.TeamGuestRoleId) {
 			teamGuestCount++
 		}
 
-		// Check if the team has any channels
-		if team.Channels != nil && len(*team.Channels) > 0 {
+		if len(model.SafeDereference(team.Channels)) > 0 {
 			hasChannels = true
-			teamChannels := len(*team.Channels)
-			totalChannels += teamChannels
+			totalChannels += len(*team.Channels)
 
 			for _, channel := range *team.Channels {
 				if channel.Roles != nil && model.IsInRole(*channel.Roles, model.ChannelGuestRoleId) {
@@ -787,7 +783,7 @@ func validateGuestRoles(data UserImportData) *model.AppError {
 	}
 
 	// Set flags based on whether all available teams/channels have guest roles
-	if hasTeams && teamGuestCount == totalTeams {
+	if totalTeams > 0 && teamGuestCount == totalTeams {
 		isTeamGuest = true
 	}
 
@@ -798,7 +794,7 @@ func validateGuestRoles(data UserImportData) *model.AppError {
 	// If the user is a system guest, they must have consistent guest roles in any teams/channels they belong to
 	if isSystemGuest {
 		// If they have teams, they must be a team guest in all teams
-		if hasTeams && !isTeamGuest {
+		if totalTeams > 0 && !isTeamGuest {
 			return model.NewAppError("BulkImport", "app.import.validate_user_import_data.system_guest_missing_team_guest_roles.error", map[string]any{"TeamGuestCount": teamGuestCount, "TotalTeams": totalTeams}, "", http.StatusBadRequest)
 		}
 

@@ -3,13 +3,6 @@
 name: Build Backend Staging
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'server/**'
-      - 'docker/Dockerfile.backend'
-      - '.github/workflows/build-backend.yaml'
   workflow_dispatch:
 
 permissions:

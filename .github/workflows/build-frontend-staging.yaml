@@ -3,13 +3,6 @@
 name: Build Frontend Staging
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'webapp/**'
-      - 'docker/Dockerfile.frontend'
-      - '.github/workflows/build-frontend.yaml'
   workflow_dispatch:
 
 permissions:

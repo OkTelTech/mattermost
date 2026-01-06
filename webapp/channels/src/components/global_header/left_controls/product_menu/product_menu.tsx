@@ -135,11 +135,13 @@ const ProductMenu = (): JSX.Element => {
                             size={20}
                             color='rgba(var(--sidebar-text-rgb), 0.56)'
                         />
+                        {/* Hidden logo and Team Edition badge - only show menu icon
                         {isFreeEdition ? (
                             <ProductBrandingFreeEdition/>
                         ) : (
                             <ProductBranding/>
                         )}
+                        */}
                     </ProductMenuButton>
                 </ProductMenuContainer>
                 <Menu

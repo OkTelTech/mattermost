@@ -8,7 +8,7 @@ import type {Team} from '@mattermost/types/teams';
 
 import Input from 'components/widgets/inputs/input/input';
 
-import logoImage from 'images/logo.png';
+import logoImage from 'images/logo-oktel.png';
 import Constants from 'utils/constants';
 import {cleanUpUrlable} from 'utils/url';
 

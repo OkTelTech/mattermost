@@ -23,7 +23,7 @@ import LoadingScreen from 'components/loading_screen';
 import SystemPermissionGate from 'components/permissions_gates/system_permission_gate';
 import LogoutIcon from 'components/widgets/icons/fa_logout_icon';
 
-import logoImage from 'images/logo.png';
+import logoImage from 'images/logo-oktel.png';
 import Constants from 'utils/constants';
 import * as UserAgent from 'utils/user_agent';
 

@@ -12,7 +12,7 @@ import type {ActionResult} from 'mattermost-redux/types/actions';
 import ExternalLink from 'components/external_link';
 import WithTooltip from 'components/with_tooltip';
 
-import logoImage from 'images/logo.png';
+import logoImage from 'images/logo-oktel.png';
 import Constants from 'utils/constants';
 import * as URL from 'utils/url';
 

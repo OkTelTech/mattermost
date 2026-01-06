@@ -56,8 +56,8 @@ const MenuStartTrial = (props: Props): JSX.Element | null => {
             role='menuitem'
             id={props.id}
         >
-            <FreeVersionBadge>{badgeText}</FreeVersionBadge>
-            <div className='editionText'>
+            {/* <FreeVersionBadge>{badgeText}</FreeVersionBadge> */}
+            {/* <div className='editionText'>
                 {isEntryLicense ? (
                     formatMessage({
                         id: 'navbar_dropdown.entryVersionText',
@@ -91,7 +91,7 @@ const MenuStartTrial = (props: Props): JSX.Element | null => {
                         },
                     )
                 )}
-            </div>
+            </div> */}
         </li>
     );
 };

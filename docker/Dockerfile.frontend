@@ -1,0 +1,91 @@
+# Mattermost Frontend Docker Image
+# Builds the React webapp and serves via nginx
+
+# =============================================================================
+# Stage 1: Build the webapp
+# =============================================================================
+# Use Debian-based image for glibc compatibility with imagemin binaries
+FROM node:20.11-bookworm AS builder
+
+# Install build dependencies for native modules
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git python3 make g++ \
+    autoconf automake libtool nasm pkg-config \
+    libpng-dev libjpeg-dev libpango1.0-dev libgif-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy all webapp source code (needed for npm workspaces lifecycle scripts)
+COPY webapp/ ./
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps
+
+# Disable image optimization to avoid imagemin binary compatibility issues
+# The image-webpack-loader uses prebuilt binaries that may not work across platforms
+WORKDIR /app/channels
+RUN sed -i "s/!DEV && {/false \&\& {/g" webpack.config.js
+
+# Build the application
+RUN npm run build
+
+# =============================================================================
+# Stage 2: Nginx for serving static files
+# =============================================================================
+FROM nginx:1.25-alpine
+
+# Build arguments
+ARG PUID=1000
+ARG PGID=1000
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
+
+# Create non-root user
+RUN addgroup -g ${PGID} mattermost && \
+    adduser -u ${PUID} -G mattermost -s /bin/sh -D mattermost
+
+# Copy built assets to nginx html directory
+# Assets are served from /static/ path
+COPY --from=builder /app/channels/dist /usr/share/nginx/html/static
+
+# Copy nginx configuration
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
+
+# Copy nginx config template (processed at runtime by custom entrypoint)
+COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
+
+# Copy custom entrypoint that only substitutes BACKEND_HOST
+COPY --chmod=755 docker/nginx/docker-entrypoint.sh /docker-entrypoint.sh
+
+# Default backend host (override in docker-compose or K8s)
+ENV BACKEND_HOST=mattermost-backend
+
+# Create required directories with correct permissions
+RUN mkdir -p /var/cache/nginx/client_temp \
+             /var/cache/nginx/proxy_temp \
+             /var/cache/nginx/fastcgi_temp \
+             /var/cache/nginx/uwsgi_temp \
+             /var/cache/nginx/scgi_temp \
+             /var/run \
+             /var/log/nginx && \
+    chown -R mattermost:mattermost /var/cache/nginx \
+                                    /var/run \
+                                    /var/log/nginx \
+                                    /usr/share/nginx/html \
+                                    /etc/nginx && \
+    chmod -R 755 /var/cache/nginx /etc/nginx
+
+# Use non-root user
+USER mattermost
+
+# Expose port 8080 (non-privileged)
+EXPOSE 8080
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Start nginx via custom entrypoint
+CMD ["/docker-entrypoint.sh"]

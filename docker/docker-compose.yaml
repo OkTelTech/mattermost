@@ -1,0 +1,106 @@
+# Mattermost Local Development - Docker Compose
+# Runs separate frontend and backend containers for testing
+
+services:
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: mm-postgres
+    environment:
+      POSTGRES_USER: mmuser
+      POSTGRES_PASSWORD: mostest
+      POSTGRES_DB: mattermost
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mmuser -d mattermost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Mattermost Backend (Go Server)
+  # ==========================================================================
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: mm-backend
+    environment:
+      # Database (same as staging, different connection string for local)
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: "postgres://mmuser:mostest@postgres:5432/mattermost?sslmode=disable&connect_timeout=10"
+
+      # Service settings (matching staging)
+      MM_SERVICESETTINGS_SITEURL: "http://localhost:8080"
+      MM_SERVICESETTINGS_LISTENADDRESS: ":8065"
+      MM_SERVICESETTINGS_WEBSERVERMODE: "disabled"
+      MM_SERVICESETTINGS_ENABLELOCALMODE: "true"
+      MM_SERVICESETTINGS_ENABLEOPENSERVER: "false"
+      MM_SERVICESETTINGS_EXPERIMENTALGROUPUNREADCHANNELS: "default_on"
+
+      # CORS configuration (matching staging)
+      MM_SERVICESETTINGS_ALLOWCORSFROM: "*"
+      MM_SERVICESETTINGS_CORSALLOWCREDENTIALS: "true"
+      MM_SERVICESETTINGS_CORSEXPOSEDHEADERS: "X-Request-Id"
+
+      # File storage (local for dev, staging uses GCS)
+      MM_FILESETTINGS_DRIVERNAME: local
+      MM_FILESETTINGS_DIRECTORY: /mattermost/data/files
+      MM_FILESETTINGS_MAXFILESIZE: "104857600"
+
+      # Logging (matching staging)
+      MM_LOGSETTINGS_CONSOLELEVEL: "INFO"
+      MM_LOGSETTINGS_ENABLEFILE: "false"
+
+      # Disable telemetry for local dev
+      MM_LOGSETTINGS_ENABLEDIAGNOSTICS: "false"
+    ports:
+      - "8065:8065"
+      - "8067:8067"
+    volumes:
+      - backend_data:/mattermost/data
+      - backend_logs:/mattermost/logs
+      - backend_plugins:/mattermost/plugins
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/mattermost/bin/mmctl", "system", "status", "--local"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ==========================================================================
+  # Mattermost Frontend (Nginx)
+  # ==========================================================================
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: mm-frontend
+    environment:
+      # Backend service name in docker-compose
+      BACKEND_HOST: backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  backend_data:
+  backend_logs:
+  backend_plugins:

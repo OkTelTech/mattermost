@@ -1,0 +1,107 @@
+# Mattermost Backend Docker Image
+# Builds the Go server without webapp static files
+
+# =============================================================================
+# Stage 1: Build the server
+# =============================================================================
+FROM golang:1.24-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git make bash gcc musl-dev
+
+WORKDIR /app
+
+# Copy go mod files for dependency caching
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+
+# Copy server source code
+COPY server/ ./
+
+# Setup go workspace
+RUN make setup-go-work || true
+
+# Build the server binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/mattermost ./cmd/mattermost
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/mmctl ./cmd/mmctl
+
+# =============================================================================
+# Stage 2: Runtime image
+# =============================================================================
+FROM ubuntu:noble-20251013
+
+# Build Arguments
+ARG PUID=2000
+ARG PGID=2000
+
+# Install runtime dependencies for document processing
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+    ca-certificates \
+    curl \
+    media-types \
+    mailcap \
+    unrtf \
+    wv \
+    poppler-utils \
+    tidy \
+    tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create mattermost user and group
+RUN groupadd --gid ${PGID} mattermost && \
+    useradd --uid ${PUID} --gid ${PGID} --comment "" --home-dir /mattermost mattermost
+
+# Create required directories
+RUN mkdir -p /mattermost/bin \
+             /mattermost/data \
+             /mattermost/plugins \
+             /mattermost/client/plugins \
+             /mattermost/config \
+             /mattermost/logs \
+             /mattermost/i18n \
+             /mattermost/templates \
+             /mattermost/fonts && \
+    chown -R mattermost:mattermost /mattermost
+
+# Copy server binary
+COPY --from=builder --chown=mattermost:mattermost /app/bin/mattermost /mattermost/bin/
+COPY --from=builder --chown=mattermost:mattermost /app/bin/mmctl /mattermost/bin/
+
+# Copy server assets (i18n, templates, fonts)
+COPY --from=builder --chown=mattermost:mattermost /app/i18n /mattermost/i18n
+COPY --from=builder --chown=mattermost:mattermost /app/templates /mattermost/templates
+COPY --from=builder --chown=mattermost:mattermost /app/fonts /mattermost/fonts
+
+# Note: No config.json needed - server uses environment variables
+
+# Environment variables
+ENV PATH="/mattermost/bin:${PATH}"
+ENV MM_INSTALL_TYPE="docker"
+
+# IMPORTANT: Disable static file serving - frontend handles this
+ENV MM_SERVICESETTINGS_WEBSERVERMODE="disabled"
+
+# Enable local mode for mmctl healthcheck
+ENV MM_SERVICESETTINGS_ENABLELOCALMODE="true"
+
+# Switch to non-root user
+USER mattermost
+
+# Set working directory
+WORKDIR /mattermost
+
+# Healthcheck using mmctl
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ["/mattermost/bin/mmctl", "system", "status", "--local"]
+
+# Expose ports
+# 8065: HTTP API and WebSocket
+# 8067: Metrics (Prometheus)
+EXPOSE 8065 8067
+
+# Start the server
+CMD ["/mattermost/bin/mattermost"]
+
+# Declare volumes
+VOLUME ["/mattermost/data", "/mattermost/logs", "/mattermost/config", "/mattermost/plugins", "/mattermost/client/plugins"]

@@ -1,0 +1,211 @@
+# Mattermost Frontend - Server Configuration
+# Routes static files and proxies API/WebSocket to backend
+
+# Upstream backend server
+# Uses BACKEND_HOST env var (defaults to mattermost-backend for K8s)
+upstream mattermost_backend {
+    server ${BACKEND_HOST}:8065;
+    keepalive 32;
+}
+
+# WebSocket upgrade map
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+
+    # Client max body size for file uploads
+    # Should match MM_FILESETTINGS_MAXFILESIZE (100MB)
+    client_max_body_size 100M;
+
+    # =========================================================================
+    # Static Assets - served directly by nginx
+    # =========================================================================
+
+    # Main static files location
+    location /static/ {
+        alias /usr/share/nginx/html/static/;
+
+        # Hashed assets (content-based hash in filename) - cache for 1 year
+        location ~* \.[0-9a-f]+\.(js|css|woff2?|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            add_header X-Content-Type-Options nosniff always;
+        }
+
+        # Images with hash - cache for 1 year
+        location ~* \.[0-9a-f]+\.(png|jpg|jpeg|gif|ico|svg|webp)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # root.html - no cache (SPA entry point)
+        location = /static/root.html {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma "no-cache";
+        }
+
+        # remote_entry.js - no cache (module federation for plugins)
+        location = /static/remote_entry.js {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+
+        # i18n files - cache for 1 day (translations)
+        location /static/i18n/ {
+            expires 1d;
+            add_header Cache-Control "public";
+        }
+
+        # Default for other static files
+        expires 7d;
+        add_header Cache-Control "public";
+        try_files $uri =404;
+    }
+
+    # =========================================================================
+    # API Routes - proxy to backend
+    # =========================================================================
+
+    location /api/ {
+        proxy_pass http://mattermost_backend;
+        proxy_http_version 1.1;
+
+        # Headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-Id $request_id;
+
+        # WebSocket support for /api/v4/websocket
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        # Timeouts - long for WebSocket connections
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 86400s;
+        proxy_read_timeout 86400s;
+
+        # Disable buffering for real-time
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # =========================================================================
+    # Plugin Routes - proxy to backend
+    # =========================================================================
+
+    location /plugins/ {
+        proxy_pass http://mattermost_backend;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Some plugins use WebSocket
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 86400s;
+    }
+
+    # Plugin static assets (served from backend)
+    location /static/plugins/ {
+        proxy_pass http://mattermost_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_cache_valid 200 1d;
+    }
+
+    # =========================================================================
+    # File Operations - proxy to backend
+    # =========================================================================
+
+    location /files/ {
+        proxy_pass http://mattermost_backend;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Larger timeout for file uploads
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        # Disable buffering for large files
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # =========================================================================
+    # OAuth & Auth Routes - proxy to backend
+    # =========================================================================
+
+    location ~ ^/(oauth|login|signup)/ {
+        proxy_pass http://mattermost_backend;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # =========================================================================
+    # Other Backend Routes
+    # =========================================================================
+
+    # Robots.txt from backend
+    location = /robots.txt {
+        proxy_pass http://mattermost_backend;
+    }
+
+    # Broadcast routes (for calls plugin)
+    location /broadcast/ {
+        proxy_pass http://mattermost_backend;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 86400s;
+    }
+
+    # =========================================================================
+    # Health Check Endpoint
+    # =========================================================================
+
+    location = /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    # =========================================================================
+    # SPA Fallback - serve root.html for all other routes
+    # =========================================================================
+
+    location / {
+        # Try static file first, then fall back to root.html
+        try_files /static/root.html =404;
+
+        # No cache for HTML
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+    }
+}

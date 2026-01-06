@@ -1,15 +1,15 @@
-# Build Backend Image
+# Build Frontend Image
 # Builds and pushes image, then triggers infra repo for deployment
-name: Build Backend
+name: Build Frontend Staging
 
 on:
   push:
     branches:
       - master
     paths:
-      - 'server/**'
-      - 'docker/Dockerfile.backend'
-      - '.github/workflows/build-backend.yaml'
+      - 'webapp/**'
+      - 'docker/Dockerfile.frontend'
+      - '.github/workflows/build-frontend.yaml'
   workflow_dispatch:
 
 permissions:
@@ -19,11 +19,14 @@ env:
   PROJECT_ID: oktel-482615
   REGION: asia-southeast1
   REPOSITORY: mattermost
-  IMAGE_NAME: backend
+  IMAGE_NAME: frontend
 
 jobs:
+  # Job 1: Build and push image
   build:
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Checkout repository
@@ -49,17 +52,17 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Image version: ${VERSION}"
 
-      - name: Build and Push Backend Image
+      - name: Build and Push Frontend Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/Dockerfile.backend
+          file: ./docker/Dockerfile.frontend
           push: true
           tags: |
             ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
             ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
 
       - name: Output build info
         run: |
@@ -68,6 +71,12 @@ jobs:
           echo "**Image:** \`${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${GITHUB_SHA}\`" >> $GITHUB_STEP_SUMMARY
 
+  # Job 2: Trigger infra deployment (separate job - can re-run independently)
+  trigger-deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Trigger infra deployment
         uses: peter-evans/repository-dispatch@v3
         with:
@@ -76,8 +85,16 @@ jobs:
           event-type: deploy-staging
           client-payload: |
             {
-              "component": "backend",
-              "image_tag": "${{ steps.meta.outputs.version }}",
+              "component": "frontend",
+              "image_tag": "${{ needs.build.outputs.image_tag }}",
               "source_sha": "${{ github.sha }}",
               "source_repo": "${{ github.repository }}"
             }
+
+      - name: Output trigger info
+        run: |
+          echo "### Deployment Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Component:** frontend" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ needs.build.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Infra Repo:** ${{ github.repository_owner }}/infra" >> $GITHUB_STEP_SUMMARY

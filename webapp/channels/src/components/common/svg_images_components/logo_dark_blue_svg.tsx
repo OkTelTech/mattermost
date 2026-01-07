@@ -16,8 +16,8 @@ export default (props: Props) => (
         className={props.className}
         src={logoImage}
         alt='Oktel'
-        width={props.width || 182}
-        height={props.height || 30}
+        width={props.width || 200}
+        height={props.height || 200}
         style={{objectFit: 'contain'}}
     />
 );

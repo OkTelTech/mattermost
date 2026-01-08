@@ -214,6 +214,7 @@ const ProductMenuList = (props: Props): JSX.Element | null => {
                     text={formatMessage({id: 'navbar_dropdown.nativeApps', defaultMessage: 'Download Apps'})}
                     icon={<DownloadOutlineIcon size={18}/>}
                 />
+{/* Hidden About Mattermost menu item
                 <Menu.ItemToggleModalRedux
                     id='about'
                     modalId={ModalIdentifiers.ABOUT}
@@ -221,6 +222,7 @@ const ProductMenuList = (props: Props): JSX.Element | null => {
                     text={formatMessage({id: 'navbar_dropdown.about', defaultMessage: 'About {appTitle}'}, {appTitle: siteName})}
                     icon={<InformationOutlineIcon size={18}/>}
                 />
+*/}
             </div>
         </Menu.Group>
     );

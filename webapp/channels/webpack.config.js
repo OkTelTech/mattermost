@@ -176,6 +176,7 @@ var config = {
                 {from: 'src/images/img_trans.gif', to: 'images'},
                 {from: 'src/images/logo-email.png', to: 'images'},
                 {from: 'src/images/favicon', to: 'images/favicon'},
+                {from: 'src/images/logo-oktel.png', to: 'images'},
                 {from: 'src/images/appIcons.png', to: 'images'},
                 {from: 'src/images/logo-email.png', to: 'images'},
                 {from: 'src/images/browser-icons', to: 'images/browser-icons'},
@@ -205,10 +206,10 @@ var config = {
         // Generate manifest.json, honouring any configured publicPath. This also handles injecting
         // <link rel="apple-touch-icon" ... /> and <meta name="apple-*" ... /> tags into root.html.
         new WebpackPwaManifest({
-            name: 'Mattermost',
-            short_name: 'Mattermost',
+            name: 'Oktel',
+            short_name: 'Oktel',
             start_url: '..',
-            description: 'Mattermost is an open source, self-hosted Slack-alternative',
+            description: 'Oktel - Team Communication Platform',
             background_color: '#ffffff',
             inject: true,
             ios: true,

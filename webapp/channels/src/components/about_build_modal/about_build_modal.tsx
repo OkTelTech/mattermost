@@ -100,16 +100,6 @@ export default function AboutBuildModal(props: Props) {
 
     let learnMore = (
         <div>
-            <FormattedMessage
-                id='about.teamEditionLearn'
-                defaultMessage='Join the Mattermost community at '
-            />
-            <ExternalLink
-                location='about_build_modal'
-                href='https://mattermost.com/community/'
-            >
-                {'mattermost.com/community/'}
-            </ExternalLink>
         </div>
     );
 

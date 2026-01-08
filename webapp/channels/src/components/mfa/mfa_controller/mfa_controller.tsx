@@ -11,7 +11,7 @@ import {emitUserLoggedOutEvent} from 'actions/global_actions';
 import BackButton from 'components/common/back_button';
 import LogoutIcon from 'components/widgets/icons/fa_logout_icon';
 
-import logoImage from 'images/logo.png';
+import logoImage from 'images/logo-oktel.png';
 
 import Confirm from '../confirm';
 import Setup from '../setup';

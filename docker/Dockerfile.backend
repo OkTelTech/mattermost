@@ -61,8 +61,15 @@ RUN mkdir -p /mattermost/bin \
              /mattermost/logs \
              /mattermost/i18n \
              /mattermost/templates \
-             /mattermost/fonts && \
+             /mattermost/fonts \
+             /mattermost/prepackaged_plugins && \
     chown -R mattermost:mattermost /mattermost
+
+# Download prepackaged plugins (Calls)
+ARG CALLS_PLUGIN_VERSION=1.10.0
+RUN curl -fsSL "https://github.com/mattermost/mattermost-plugin-calls/releases/download/v${CALLS_PLUGIN_VERSION}/com.mattermost.calls-${CALLS_PLUGIN_VERSION}.tar.gz" \
+    -o /mattermost/prepackaged_plugins/com.mattermost.calls.tar.gz && \
+    chown mattermost:mattermost /mattermost/prepackaged_plugins/com.mattermost.calls.tar.gz
 
 # Copy server binary
 COPY --from=builder --chown=mattermost:mattermost /app/bin/mattermost /mattermost/bin/
@@ -79,8 +86,9 @@ COPY --from=builder --chown=mattermost:mattermost /app/fonts /mattermost/fonts
 ENV PATH="/mattermost/bin:${PATH}"
 ENV MM_INSTALL_TYPE="docker"
 
-# IMPORTANT: Disable static file serving - frontend handles this
-ENV MM_SERVICESETTINGS_WEBSERVERMODE="disabled"
+# Enable webserver mode to serve plugin static files
+# Frontend still handles main webapp static files
+ENV MM_SERVICESETTINGS_WEBSERVERMODE="gzip"
 
 # Enable local mode for mmctl healthcheck
 ENV MM_SERVICESETTINGS_ENABLELOCALMODE="true"

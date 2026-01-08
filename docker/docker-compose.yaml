@@ -38,7 +38,8 @@ services:
       # Service settings (matching staging)
       MM_SERVICESETTINGS_SITEURL: "http://localhost:8080"
       MM_SERVICESETTINGS_LISTENADDRESS: ":8065"
-      MM_SERVICESETTINGS_WEBSERVERMODE: "disabled"
+      # Enable webserver mode to serve plugin static files
+      MM_SERVICESETTINGS_WEBSERVERMODE: "gzip"
       MM_SERVICESETTINGS_ENABLELOCALMODE: "true"
       MM_SERVICESETTINGS_ENABLEOPENSERVER: "false"
       MM_SERVICESETTINGS_EXPERIMENTALGROUPUNREADCHANNELS: "default_on"
@@ -59,6 +60,13 @@ services:
 
       # Disable telemetry for local dev
       MM_LOGSETTINGS_ENABLEDIAGNOSTICS: "false"
+
+      # Plugin settings - Enable Calls
+      MM_PLUGINSETTINGS_ENABLE: "true"
+      MM_PLUGINSETTINGS_ENABLEUPLOADS: "true"
+      MM_PLUGINSETTINGS_AUTOMATICPREPACKAGEDPLUGINS: "true"
+      # Calls plugin config - enable by default for all users
+      MM_PLUGINSETTINGS_PLUGINS: '{"com.mattermost.calls":{"defaultenabled":true,"allowscreensharing":true}}'
     ports:
       - "8065:8065"
       - "8067:8067"

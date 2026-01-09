@@ -361,6 +361,7 @@ type ServiceSettings struct {
 	RestrictLinkPreviews                *string  `access:"site_posts"`
 	EnableTesting                       *bool    `access:"environment_developer,write_restrictable,cloud_restrictable"`
 	EnableDeveloper                     *bool    `access:"environment_developer,write_restrictable,cloud_restrictable"`
+	EnableAPIDocumentation              *bool    `access:"environment_developer,write_restrictable,cloud_restrictable"`
 	DeveloperFlags                      *string  `access:"environment_developer,cloud_restrictable"`
 	EnableClientPerformanceDebugging    *bool    `access:"environment_developer,write_restrictable,cloud_restrictable"`
 	EnableSecurityFixAlert              *bool    `access:"environment_smtp,write_restrictable,cloud_restrictable"`
@@ -507,6 +508,10 @@ func (s *ServiceSettings) SetDefaults(isUpdate bool) {
 
 	if s.EnableDeveloper == nil {
 		s.EnableDeveloper = NewPointer(false)
+	}
+
+	if s.EnableAPIDocumentation == nil {
+		s.EnableAPIDocumentation = NewPointer(false)
 	}
 
 	if s.DeveloperFlags == nil {

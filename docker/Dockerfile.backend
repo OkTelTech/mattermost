@@ -73,6 +73,14 @@ RUN curl -fsSL "https://github.com/mattermost/mattermost-plugin-calls/releases/d
     rm /tmp/calls.tar.gz && \
     chown -R mattermost:mattermost /mattermost/plugins
 
+# Download and install Jitsi plugin
+ARG JITSI_PLUGIN_VERSION=3.1.0
+RUN curl -fsSL "https://github.com/mattermost/mattermost-plugin-jitsi/releases/download/v${JITSI_PLUGIN_VERSION}/jitsi-${JITSI_PLUGIN_VERSION}.tar.gz" \
+    -o /tmp/jitsi.tar.gz && \
+    tar -xzf /tmp/jitsi.tar.gz -C /mattermost/plugins && \
+    rm /tmp/jitsi.tar.gz && \
+    chown -R mattermost:mattermost /mattermost/plugins
+
 # Copy server binary
 COPY --from=builder --chown=mattermost:mattermost /app/bin/mattermost /mattermost/bin/
 COPY --from=builder --chown=mattermost:mattermost /app/bin/mmctl /mattermost/bin/
@@ -84,19 +92,9 @@ COPY --from=builder --chown=mattermost:mattermost /app/fonts /mattermost/fonts
 
 # Note: No config.json needed - server uses environment variables
 
-# Environment variables
+# Environment variables (only image-specific settings)
 ENV PATH="/mattermost/bin:${PATH}"
 ENV MM_INSTALL_TYPE="docker"
-
-# Enable webserver mode to serve plugin static files
-# Frontend still handles main webapp static files
-ENV MM_SERVICESETTINGS_WEBSERVERMODE="gzip"
-
-# Enable local mode for mmctl healthcheck
-ENV MM_SERVICESETTINGS_ENABLELOCALMODE="true"
-
-# Enable Calls plugin by default
-ENV MM_PLUGINSETTINGS_PLUGINSTATES_COM_MATTERMOST_CALLS_ENABLE="true"
 
 # Switch to non-root user
 USER mattermost

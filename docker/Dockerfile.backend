@@ -73,13 +73,11 @@ RUN curl -fsSL "https://github.com/mattermost/mattermost-plugin-calls/releases/d
     rm /tmp/calls.tar.gz && \
     chown -R mattermost:mattermost /mattermost/plugins
 
-# Download and install Jitsi plugin
+# Download and install Jitsi plugin to prepackaged_plugins (avoid being removed by plugin sync)
 ARG JITSI_PLUGIN_VERSION=2.1.0
 RUN curl -fsSL "https://github.com/mattermost-community/mattermost-plugin-jitsi/releases/download/v${JITSI_PLUGIN_VERSION}/jitsi-${JITSI_PLUGIN_VERSION}.tar.gz" \
-    -o /tmp/jitsi.tar.gz && \
-    tar -xzf /tmp/jitsi.tar.gz -C /mattermost/plugins && \
-    rm /tmp/jitsi.tar.gz && \
-    chown -R mattermost:mattermost /mattermost/plugins
+    -o /mattermost/prepackaged_plugins/jitsi-${JITSI_PLUGIN_VERSION}.tar.gz && \
+    chown mattermost:mattermost /mattermost/prepackaged_plugins/jitsi-${JITSI_PLUGIN_VERSION}.tar.gz
 
 # Copy server binary
 COPY --from=builder --chown=mattermost:mattermost /app/bin/mattermost /mattermost/bin/

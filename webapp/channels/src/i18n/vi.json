@@ -5153,5 +5153,10 @@
   "channel_header.channel_settings": "Cài đặt Kênh",
   "channel_header.members": "Thành viên",
   "pluginsMenu.more_actions": "Thao tác khác",
-  "global_header.productChannels": "Kênh trò chuyện"
+  "global_header.productChannels": "Kênh trò chuyện",
+  "user_settings.notifications.test_notification.body": "Không nhận được thông báo? Hãy bắt đầu bằng cách gửi thông báo thử nghiệm đến tất cả thiết bị của bạn để kiểm tra xem chúng có hoạt động như mong đợi không. Nếu vấn đề vẫn tiếp diễn, hãy khám phá các bước khắc phục sự cố.",
+  "user_settings.notifications.test_notification.go_to_docs": "Tài liệu khắc phục sự cố",
+  "user_settings.notifications.test_notification.send_button.send": "Gửi thông báo thử nghiệm",
+  "user_settings.notifications.test_notification.title": "Khắc phục sự cố thông báo",
+  "userSettingsModal.pluginPreferences.header": "TÙY CHỌN PLUGIN"
 }

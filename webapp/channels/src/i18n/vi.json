@@ -5152,5 +5152,6 @@
   "footer_pagination.prev": "Trước",
   "channel_header.channel_settings": "Cài đặt Kênh",
   "channel_header.members": "Thành viên",
-  "pluginsMenu.more_actions": "Thao tác khác"
+  "pluginsMenu.more_actions": "Thao tác khác",
+  "global_header.productChannels": "Kênh trò chuyện"
 }

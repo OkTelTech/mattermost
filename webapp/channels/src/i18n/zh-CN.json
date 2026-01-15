@@ -6749,5 +6749,17 @@
   "yourcomputer": "您的电脑",
   "youtube_video.play.aria_label": "在 YouTube 上播放 {videoTitle}",
   "youtube_video.play_button.aria_label": "播放视频",
-  "youtube_video.thumbnail.alt_text": "YouTube 上的 {videoTitle} 的缩略图"
+  "youtube_video.thumbnail.alt_text": "YouTube 上的 {videoTitle} 的缩略图",
+  "admin.reset_email.enterCurrentPassword": "输入当前密码",
+  "admin.reset_email.enterNewEmail": "输入新邮箱地址",
+  "admin.reset_email.titleResetFor": "更新 {name} 的邮箱",
+  "admin.reset_email.update": "更新",
+  "admin.reset_password.currentPassword": "当前密码",
+  "admin.reset_password.enterCurrentPassword": "输入当前密码",
+  "admin.reset_password.enterNewPassword": "输入新密码",
+  "admin.reset_password.titleResetFor": "重置 {name} 的密码",
+  "admin.reset_password.titleSwitchFor": "将 {name} 的账户切换为邮箱/密码登录",
+  "error.magic_link_already_logged_in.message": "您已登录。请先登出后再试。",
+  "error.magic_link_already_logged_in.title": "无法使用魔法链接登录",
+  "global_header.productChannels": "频道"
 }

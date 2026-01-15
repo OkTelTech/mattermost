@@ -153,7 +153,7 @@ const ProductMenu = (): JSX.Element => {
                     <ProductMenuItem
                         destination={'/'}
                         icon={'product-channels'}
-                        text={'Channels'}
+                        text={formatMessage({id: 'global_header.productChannels', defaultMessage: 'Channels'})}
                         active={isChannels(currentProductID)}
                         onClick={handleClick}
                     />

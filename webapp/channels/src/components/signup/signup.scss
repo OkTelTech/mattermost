@@ -6,7 +6,7 @@
 .signup-body {
     display: flex;
     flex-direction: column;
-    margin: auto;
+    padding-bottom: 32px;
 
     .signup-body-action {
         display: flex;
@@ -28,38 +28,17 @@
         flex: 1;
         align-items: center;
         justify-content: center;
-
-        .signup-body-no-login {
-            display: flex;
-            max-width: 540px;
-            flex-flow: column;
-            justify-content: center;
-
-            .signup-body-no-login-title {
-                color: var(--title-color-indigo-500);
-                font-family: Metropolis;
-                font-size: 40px;
-                font-weight: 600;
-                letter-spacing: -0.02em;
-                line-height: 48px;
-                text-align: center;
-            }
-
-            .signup-body-no-login-subtitle {
-                color: rgba(var(--center-channel-color-rgb), 0.75);
-                font-size: 18px;
-                font-weight: 400;
-                line-height: 28px;
-                text-align: center;
-            }
-        }
+        padding: 0 60px;
 
         .signup-body-message-subtitle {
-            padding-right: 170px;
-            color: rgba(var(--center-channel-color-rgb), 0.75);
-            font-size: 18px;
+            position: relative;
+            z-index: 1;
+            color: #FFFFFF;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 20px;
             font-weight: 400;
-            line-height: 28px;
+            line-height: 24px;
+            letter-spacing: 0%;
         }
 
         .signup-body-message {
@@ -67,15 +46,34 @@
             width: 540px;
             flex-flow: column;
             align-self: flex-start;
+            position: relative;
 
             .signup-body-message-title {
-                padding-right: 60px;
-                color: var(--title-color-indigo-500);
-                font-family: Metropolis;
-                font-size: 80px;
+                position: relative;
+                z-index: 1;
+                color: #FFFFFF;
+                font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+                font-size: 40px;
                 font-weight: 600;
-                letter-spacing: -0.01em;
-                line-height: 88px;
+                line-height: 40px;
+                letter-spacing: 0%;
+            }
+
+            .auth-page-gradient {
+                position: fixed;
+                top: 0;
+                left: 10%;
+                width: 1000px;
+                height: 100vh;
+                transform: translateX(-50%);
+                object-fit: cover;
+                z-index: 0;
+                pointer-events: none;
+                opacity: 0.3;
+
+                @media (max-width: 1199px) {
+                    left: 50%;
+                }
             }
 
             .signup-body-message-svg {
@@ -85,8 +83,8 @@
                 svg {
                     position: absolute;
                     z-index: 2;
-                    bottom: -220px;
-                    left: -267px;
+                    bottom: -210px;
+                    left: -178px;
                     display: block;
                 }
             }
@@ -99,35 +97,31 @@
 
                     .signup-body-message-subtitle,
                     .signup-body-custom-branding-markdown {
-                        text-align: center;
+                        text-align: left;
                     }
                 }
 
-                .signup-body-message-subtitle {
-                    padding-right: 0;
-                }
-
                 .signup-body-custom-branding-image {
-                    max-height: 540px;
-                    align-self: center;
+                    position: relative;
+                    z-index: 1;
+                    max-height: 240px;
+                    align-self: self-start;
                     border-radius: 8px;
                     margin-bottom: 28px;
                 }
             }
-
-            &.with-alternate-link {
-                margin-top: 40px;
-            }
         }
 
         .signup-body-card {
+            position: relative;
+            z-index: 1;
             width: 540px;
             box-sizing: border-box;
-            border: 1px solid rgba(var(--center-channel-color-rgb), 0.08);
-            border-radius: 8px;
+            border: none;
+            border-radius: 20px 20px 0 0;
             margin-left: 60px;
-            background-color: var(--center-channel-bg);
-            box-shadow: var(--elevation-5);
+            background-color: #FFFFFF;
+            box-shadow: none;
 
             &.with-error {
                 @include mixins.shake-horizontally;
@@ -141,14 +135,46 @@
                 border: none;
                 box-shadow: none;
 
+                .signup-body-card-tabs {
+                    display: flex;
+                    justify-content: center;
+                    gap: 12px;
+                    margin-bottom: 24px;
+                    padding-bottom: 16px;
+                    border-bottom: 1px solid #E0E0E0;
+
+                    .signup-body-card-tab {
+                        padding: 10px 24px;
+                        background-color: transparent;
+                        border: none;
+                        border-radius: 8px;
+                        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+                        font-size: 16px;
+                        font-weight: 500;
+                        color: #2D2D2D;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+
+                        &:hover {
+                            background-color: #F5F5F5;
+                        }
+
+                        &.active {
+                            background-color: #2D2D2D;
+                            color: #FFFFFF;
+                        }
+                    }
+                }
+
                 .signup-body-card-title {
-                    margin: 0;
-                    color: var(--center-channel-color);
-                    font-family: 'Metropolis';
-                    font-size: 22px;
+                    color: #2D2D2D;
+                    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+                    font-size: 40px;
                     font-style: normal;
                     font-weight: 600;
-                    line-height: 28px;
+                    line-height: 40px;
+                    letter-spacing: 0%;
+                    display: none; // Hide since we're using tabs instead
                 }
 
                 .signup-body-custom-branding-markdown,
@@ -161,6 +187,7 @@
                 }
 
                 .signup-body-card-form {
+
                     .signup-body-card-form-email-input,
                     .signup-body-card-form-name-input,
                     .signup-body-card-form-password-input {
@@ -187,7 +214,15 @@
                         @include mixins.primary-button;
                         @include mixins.button-large;
 
-                        width: 100%;                    
+                        width: 100%;
+                        background-color: #2D2D2D;
+                        border-color: transparent;
+                        border-radius: 8px;
+
+                        &:hover:not(:disabled) {
+                            background-color: #1A1A1A;
+                            border-color: transparent;
+                        }
                     }
                 }
 
@@ -222,32 +257,21 @@
                         row-gap: 24px;
                     }
                 }
-
-                .signup-body-card-agreement {
-                    margin-top: 32px;
-                    color: rgba(var(--center-channel-color-rgb), 0.75);
-                    font-size: 11px;
-                    line-height: 16px;
-
-                    a {
-                        @include mixins.link;
-
-                        font-size: 11px;
-                    }
-                }
             }
         }
 
         .signup-body-custom-branding-markdown {
+            position: relative;
+            z-index: 1;
             flex: 1;
 
-            ul + p,
-            ol + p {
+            ul+p,
+            ol+p {
                 margin-top: 0.6em;
             }
 
-            p + ul,
-            p + ol {
+            p+ul,
+            p+ol {
                 margin-top: 0.6em;
             }
 
@@ -266,30 +290,19 @@
                 word-break: break-word;
             }
         }
-
-        .signup-body-content-button-container {
-            display: flex;
-            flex: 1;
-            justify-content: center;
-
-            .signup-body-content-button-return {
-                @include mixins.primary-button;
-                @include mixins.button-medium;
-            }
-        }
     }
 }
 
 @media screen and (min-width: 1680px) {
     .signup-body .signup-body-content {
+
         .signup-body-message,
-        .signup-body-card,
-        .signup-body-no-login {
+        .signup-body-card {
             width: 610px;
         }
 
         .signup-body-message .signup-body-message-title {
-            padding-right: 130px;
+            padding-right: 80px;
             margin-top: 48px;
         }
     }
@@ -297,31 +310,34 @@
 
 @media screen and (max-width: 1199px) {
     .signup-body {
+
         .signup-body-alternate-link {
             padding-right: 24px;
         }
 
         .signup-body-content {
             flex-direction: column;
+            min-width: 375px;
+            padding: 0 24px;
 
             .signup-body-message,
-            .signup-body-card,
-            .signup-body-no-login {
-                width: 640px;
+            .signup-body-card {
+                width: 100%;
+                max-width: 800px;
             }
 
             .signup-body-message {
                 align-self: center;
-                padding: 24px;
+                padding: 64px 24px;
+                text-align: center;
 
                 .signup-body-message-title {
                     padding-right: 0;
-                    font-size: 64px;
-                    line-height: 76px;
+                    font-size: 45px;
+                    line-height: 56px;
                 }
 
                 .signup-body-message-subtitle {
-                    padding: 0;
                     margin: 0;
                 }
 
@@ -337,7 +353,7 @@
             .signup-body-card {
                 border: none;
                 margin: 0;
-                background-color: unset;
+                background-color: #FFFFFF;
                 box-shadow: none;
 
                 .signup-body-card-content {
@@ -362,50 +378,28 @@
                             background-color: var(--center-channel-bg);
                         }
                     }
-                }
 
-                &.custom-branding {
-                    .signup-body-card-content {
-                        .signup-body-card-title {
-                            display: block;
-                            font-size: 32px;
-                            line-height: 40px;
-                        }
+                    &.custom-branding {
+                        .signup-body-card-content {
+                            .signup-body-card-title {
+                                display: block;
+                                margin-bottom: 24px;
+                                font-size: 32px;
+                                line-height: 40px;
 
-                        .signup-body-custom-branding-markdown,
-                        .signup-body-message-subtitle {
-                            display: block;
-                            margin: 0 0 32px;
-                            text-align: left;
+                                &:has(+ .signup-body-custom-branding-markdown) {
+                                    margin-bottom: 12px;
+                                }
+                            }
+
+                            .signup-body-custom-branding-markdown,
+                            .signup-body-message-subtitle {
+                                display: block;
+                                margin: 0 0 32px;
+                                text-align: left;
+                            }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@media screen and (max-width: 699px) {
-    .signup-body {
-        margin: auto 0;
-
-        .signup-body-content {
-            min-width: 375px;
-
-            .signup-body-card,
-            .signup-body-no-login {
-                width: 100%;
-            }
-
-            .signup-body-message {
-                width: auto;
-                align-self: flex-start;
-                padding: 24px;
-
-                .signup-body-message-title {
-                    padding-right: 0;
-                    font-size: 45px;
-                    line-height: 56px;
                 }
             }
         }

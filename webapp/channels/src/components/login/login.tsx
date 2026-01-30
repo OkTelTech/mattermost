@@ -61,6 +61,8 @@ import LoginMfa from './login_mfa';
 
 import './login.scss';
 
+import gradientLoginPage from 'images/gradient-login-page.png';
+
 const MOBILE_SCREEN_WIDTH = 1200;
 
 type LoginProps = {
@@ -956,14 +958,22 @@ const Login = ({onCustomizeHeader}: LoginProps) => {
                         />
                     ) : (
                         <h1 className='login-body-message-title'>
-                            {formatMessage({id: 'login.title', defaultMessage: 'Log in to your account'})}
+                            {formatMessage({ id: 'login.title', defaultMessage: 'Log in to your account' })}
                         </h1>
                     )}
                     {getMessageSubtitle()}
+                    {!enableCustomBrand && (
+                        <img
+                            className='auth-page-gradient'
+                            src={gradientLoginPage}
+                            alt=''
+                            aria-hidden='true'
+                        />
+                    )}
                 </div>
                 <div className='login-body-action'>
-                    {!isMobileView && getAlternateLink()}
-                    <div className={classNames('login-body-card', {'custom-branding': enableCustomBrand, 'with-error': hasError})}>
+                    {/* {!isMobileView && getAlternateLink()} */}
+                    <div className={classNames('login-body-card', { 'custom-branding': enableCustomBrand, 'with-error': hasError })}>
                         <div
                             className='login-body-card-content'
                         >
@@ -971,9 +981,21 @@ const Login = ({onCustomizeHeader}: LoginProps) => {
                                 <GuestMagicLinkCard/>
                             ) : (
                                 <>
-                                    <p className='login-body-card-title'>
-                                        {getCardTitle()}
-                                    </p>
+                                    <div className='login-body-card-tabs'>
+                                        <button
+                                            className='login-body-card-tab active'
+                                            type='button'
+                                        >
+                                            {formatMessage({ id: 'login.tab.login', defaultMessage: 'Log In' })}
+                                        </button>
+                                        <button
+                                            className='login-body-card-tab'
+                                            type='button'
+                                            onClick={() => history.push('/signup_user_complete')}
+                                        >
+                                            {formatMessage({ id: 'login.tab.register', defaultMessage: 'Sign Up' })}
+                                        </button>
+                                    </div>
                                     {enableCustomBrand && getMessageSubtitle()}
                                     {alertBanner && (
                                         <AlertBanner
@@ -1024,8 +1046,8 @@ const Login = ({onCustomizeHeader}: LoginProps) => {
                                                     extraClasses='login-body-card-form-button-submit large'
                                                     saving={isWaiting}
                                                     onClick={preSubmit}
-                                                    defaultMessage={formatMessage({id: 'login.logIn', defaultMessage: 'Log in'})}
-                                                    savingMessage={formatMessage({id: 'login.logingIn', defaultMessage: 'Logging in…'})}
+                                                    defaultMessage={formatMessage({ id: 'login.logIn', defaultMessage: 'Log in' })}
+                                                    savingMessage={formatMessage({ id: 'login.logingIn', defaultMessage: 'Logging in…' })}
                                                 />
                                             </div>
                                         </form>

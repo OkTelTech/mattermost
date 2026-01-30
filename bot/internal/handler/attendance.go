@@ -1,0 +1,332 @@
+package handler
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+
+	"oktel-bot/internal/mattermost"
+	"oktel-bot/internal/service"
+)
+
+type AttendanceHandler struct {
+	svc    *service.AttendanceService
+	mm     *mattermost.Client
+	botURL string
+}
+
+func NewAttendanceHandler(svc *service.AttendanceService, mm *mattermost.Client, botURL string) *AttendanceHandler {
+	return &AttendanceHandler{svc: svc, mm: mm, botURL: botURL}
+}
+
+// SlashCommand is the Mattermost slash command request.
+type SlashCommand struct {
+	Token       string `json:"token" schema:"token"`
+	TeamID      string `json:"team_id" schema:"team_id"`
+	ChannelID   string `json:"channel_id" schema:"channel_id"`
+	ChannelName string `json:"channel_name" schema:"channel_name"`
+	UserID      string `json:"user_id" schema:"user_id"`
+	UserName    string `json:"user_name" schema:"user_name"`
+	Command     string `json:"command" schema:"command"`
+	Text        string `json:"text" schema:"text"`
+	TriggerID   string `json:"trigger_id" schema:"trigger_id"`
+	ResponseURL string `json:"response_url" schema:"response_url"`
+}
+
+// ActionRequest is the Mattermost interactive action request.
+type ActionRequest struct {
+	UserID    string         `json:"user_id"`
+	UserName  string         `json:"user_name"`
+	ChannelID string         `json:"channel_id"`
+	PostID    string         `json:"post_id"`
+	TriggerID string         `json:"trigger_id"`
+	Type      string         `json:"type"`
+	Context   map[string]any `json:"context"`
+}
+
+// DialogSubmission is the Mattermost dialog submission.
+type DialogSubmission struct {
+	Type       string            `json:"type"`
+	CallbackID string            `json:"callback_id"`
+	UserID     string            `json:"user_id"`
+	UserName   string            `json:"user_name"`
+	ChannelID  string            `json:"channel_id"`
+	TeamID     string            `json:"team_id"`
+	Submission map[string]string `json:"submission"`
+	Cancelled  bool              `json:"cancelled"`
+}
+
+// SlashResponse is the response to a slash command.
+type SlashResponse struct {
+	ResponseType string                  `json:"response_type"` // "ephemeral" or "in_channel"
+	Text         string                  `json:"text,omitempty"`
+	Attachments  []mattermost.Attachment `json:"attachments,omitempty"`
+}
+
+// ActionResponse is the response to an interactive action.
+type ActionResponse struct {
+	Update       *ActionUpdate `json:"update,omitempty"`
+	EphemeralText string       `json:"ephemeral_text,omitempty"`
+}
+
+// ActionUpdate updates the original post.
+type ActionUpdate struct {
+	Message string              `json:"message,omitempty"`
+	Props   *mattermost.Props   `json:"props,omitempty"`
+}
+
+// HandleSlashCommand handles /attendance slash command.
+func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, SlashResponse{
+		ResponseType: "ephemeral",
+		Attachments: []mattermost.Attachment{{
+			Text: "**Attendance** - Select action:",
+			Actions: []mattermost.Action{
+				{Name: "Check In", Type: "button", Integration: mattermost.Integration{
+					URL:     h.botURL + "/api/attendance/checkin",
+					Context: map[string]any{"action": "checkin"},
+				}},
+				{Name: "Break", Type: "button", Integration: mattermost.Integration{
+					URL:     h.botURL + "/api/attendance/break-start",
+					Context: map[string]any{"action": "break-start"},
+				}},
+				{Name: "End Break", Type: "button", Integration: mattermost.Integration{
+					URL:     h.botURL + "/api/attendance/break-end",
+					Context: map[string]any{"action": "break-end"},
+				}},
+				{Name: "Check Out", Type: "button", Integration: mattermost.Integration{
+					URL:     h.botURL + "/api/attendance/checkout",
+					Context: map[string]any{"action": "checkout"},
+				}},
+				{Name: "Leave Request", Type: "button", Integration: mattermost.Integration{
+					URL:     h.botURL + "/api/attendance/leave-form",
+					Context: map[string]any{"action": "leave-form"},
+				}},
+			},
+		}},
+	})
+}
+
+// HandleCheckIn handles the check-in button click.
+func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	msg, err := h.svc.CheckIn(r.Context(), req.UserID, req.UserName, req.ChannelID)
+	if err != nil {
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		return
+	}
+	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+}
+
+// HandleBreakStart handles the break start button.
+func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	msg, err := h.svc.BreakStart(r.Context(), req.UserID, req.UserName)
+	if err != nil {
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		return
+	}
+	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+}
+
+// HandleBreakEnd handles the break end button.
+func (h *AttendanceHandler) HandleBreakEnd(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	msg, err := h.svc.BreakEnd(r.Context(), req.UserID, req.UserName)
+	if err != nil {
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		return
+	}
+	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+}
+
+// HandleCheckOut handles the check-out button.
+func (h *AttendanceHandler) HandleCheckOut(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	msg, err := h.svc.CheckOut(r.Context(), req.UserID, req.UserName)
+	if err != nil {
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		return
+	}
+	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+}
+
+// HandleLeaveForm opens the leave request dialog.
+func (h *AttendanceHandler) HandleLeaveForm(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/leave",
+		Dialog: mattermost.Dialog{
+			Title:       "Leave Request",
+			SubmitLabel: "Submit",
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: "Type",
+					Name:        "leave_type",
+					Type:        "select",
+					Options: []mattermost.SelectOption{
+						{Text: "Annual Leave", Value: "leave"},
+						{Text: "Emergency Leave", Value: "emergency"},
+						{Text: "Sick Leave", Value: "sick"},
+					},
+				},
+				{
+					DisplayName: "Start Date",
+					Name:        "start_date",
+					Type:        "text",
+					SubType:     "date",
+					Placeholder: "YYYY-MM-DD",
+				},
+				{
+					DisplayName: "End Date",
+					Name:        "end_date",
+					Type:        "text",
+					SubType:     "date",
+					Placeholder: "YYYY-MM-DD",
+				},
+				{
+					DisplayName: "Reason",
+					Name:        "reason",
+					Type:        "textarea",
+					Placeholder: "Enter your reason...",
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("ERROR open dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form. Please try again."})
+		return
+	}
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleLeaveSubmit processes the leave request dialog submission.
+func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	err := h.svc.CreateLeaveRequest(
+		r.Context(),
+		sub.UserID,
+		sub.UserName,
+		sub.ChannelID,
+		sub.Submission["leave_type"],
+		sub.Submission["start_date"],
+		sub.Submission["end_date"],
+		sub.Submission["reason"],
+	)
+	if err != nil {
+		log.Printf("ERROR create leave request: %v", err)
+		writeJSON(w, map[string]string{"error": "Failed to create leave request: " + err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// HandleApprove handles the approve button click.
+func (h *AttendanceHandler) HandleApprove(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	requestID, _ := req.Context["request_id"].(string)
+	if requestID == "" {
+		writeJSON(w, ActionResponse{EphemeralText: "Missing request ID"})
+		return
+	}
+
+	if err := h.svc.ApproveLeave(r.Context(), requestID, req.UserID, req.UserName); err != nil {
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		return
+	}
+
+	writeJSON(w, ActionResponse{
+		Update: &ActionUpdate{Message: "Processing..."},
+	})
+}
+
+// HandleReject handles the reject button click.
+func (h *AttendanceHandler) HandleReject(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	requestID, _ := req.Context["request_id"].(string)
+	if requestID == "" {
+		writeJSON(w, ActionResponse{EphemeralText: "Missing request ID"})
+		return
+	}
+
+	if err := h.svc.RejectLeave(r.Context(), requestID, req.UserID, req.UserName, ""); err != nil {
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		return
+	}
+
+	writeJSON(w, ActionResponse{
+		Update: &ActionUpdate{Message: "Processing..."},
+	})
+}
+
+// RegisterRoutes registers all attendance routes on the given mux.
+func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
+	mux.HandleFunc("POST /api/attendance/checkin", h.HandleCheckIn)
+	mux.HandleFunc("POST /api/attendance/break-start", h.HandleBreakStart)
+	mux.HandleFunc("POST /api/attendance/break-end", h.HandleBreakEnd)
+	mux.HandleFunc("POST /api/attendance/checkout", h.HandleCheckOut)
+	mux.HandleFunc("POST /api/attendance/leave-form", h.HandleLeaveForm)
+	mux.HandleFunc("POST /api/attendance/leave", h.HandleLeaveSubmit)
+	mux.HandleFunc("POST /api/attendance/approve", h.HandleApprove)
+	mux.HandleFunc("POST /api/attendance/reject", h.HandleReject)
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("ERROR encoding response: %v", err)
+	}
+}

@@ -19,7 +19,8 @@ body {
     }
 
     &.admin-onboarding {
-        background-image: url("images/admin-onboarding-background.jpg");
+        // background-image: url("images/admin-onboarding-background.jpg");
+        background: #212121;
         background-repeat: no-repeat;
         background-size: cover;
     }

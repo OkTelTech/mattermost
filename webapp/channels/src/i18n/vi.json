@@ -4112,7 +4112,7 @@
   "signup_user_completed.return": "Quay lại Đăng nhập",
   "signup_user_completed.saving": "Tạo tài khoản…",
   "signup_user_completed.signIn": "Nhấp vào đây để đăng nhập.",
-  "signup_user_completed.subtitle": "Tạo tài khoản Mattermost của bạn để bắt đầu cộng tác với nhóm của bạn",
+  "signup_user_completed.subtitle": "Tạo tài khoản của bạn để bắt đầu cộng tác với nhóm của bạn",
   "signup_user_completed.title": "Bắt đầu nào",
   "signup_user_completed.userHelp": "Bạn có thể sử dụng chữ thường, số, dấu chấm, dấu gạch ngang và dấu gạch dưới.",
   "signup_user_completed.usernameLength": "Tên người dùng phải bắt đầu bằng chữ thường và dài từ {min} - {max} ký tự. Bạn có thể sử dụng chữ thường, số, dấu chấm, dấu gạch ngang và dấu gạch dưới.",

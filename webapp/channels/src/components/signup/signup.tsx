@@ -4,7 +4,7 @@
 import classNames from 'classnames';
 import throttle from 'lodash/throttle';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FormattedMessage, useIntl } from 'react-intl';
+import { useIntl } from 'react-intl';
 import { useSelector, useDispatch } from 'react-redux';
 import { useLocation, useHistory, Route } from 'react-router-dom';
 
@@ -101,8 +101,6 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
         OpenIdButtonColor,
         EnableCustomBrand,
         CustomBrandText,
-        TermsOfServiceLink,
-        PrivacyPolicyLink,
     } = config;
     const { IsLicensed } = useSelector(getLicense);
     const loggedIn = Boolean(useSelector(getCurrentUserId));
@@ -353,7 +351,7 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
                 id: 'signup.title',
                 defaultMessage: 'Create Account | {siteName}',
             },
-            { siteName: SiteName || 'Mattermost' },
+            { siteName: SiteName || '' },
         );
     }, [formatMessage, SiteName]);
 
@@ -412,7 +410,7 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
             <p className='signup-body-message-subtitle'>
                 {formatMessage({
                     id: 'signup_user_completed.subtitle',
-                    defaultMessage: 'Create your Mattermost account to start collaborating with your team',
+                    defaultMessage: 'Create your account to start collaborating with your team',
                 })}
             </p>
         );
@@ -612,7 +610,7 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
                     onChange={() => setSubscribeToSecurityNewsletter(!subscribeToSecurityNewsletter)}
                     text={
                         formatMessage(
-                            { id: 'newsletter_optin.checkmark.text', defaultMessage: '<span>I would like to receive Mattermost security updates via newsletter.</span> By subscribing, I consent to receive emails from Mattermost with product updates, promotions, and company news. I have read the <a>Privacy Policy</a> and understand that I can <aa>unsubscribe</aa> at any time' },
+                            { id: 'newsletter_optin.checkmark.text', defaultMessage: '<span>I would like to receive security updates via newsletter.</span> By subscribing, I consent to receive emails with product updates, promotions, and company news. I have read the <a>Privacy Policy</a> and understand that I can <aa>unsubscribe</aa> at any time' },
                             {
                                 a: (chunks: React.ReactNode | React.ReactNodeArray) => (
                                     <ExternalLink
@@ -639,29 +637,7 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
                 />
             );
         }
-        return (
-            <div className='newsletter'>
-                <span className='interested'>
-                    {formatMessage({ id: 'newsletter_optin.title', defaultMessage: 'Interested in receiving Mattermost security, product, promotions, and company updates updates via newsletter?' })}
-                </span>
-                <span className='link'>
-                    {formatMessage(
-                        { id: 'newsletter_optin.desc', defaultMessage: 'Sign up at <a>{link}</a>.' },
-                        {
-                            link: HostedCustomerLinks.SECURITY_UPDATES,
-                            a: (chunks: React.ReactNode | React.ReactNodeArray) => (
-                                <ExternalLink
-                                    location='signup'
-                                    href={HostedCustomerLinks.SECURITY_UPDATES}
-                                >
-                                    {chunks}
-                                </ExternalLink>
-                            ),
-                        },
-                    )}
-                </span>
-            </div>
-        );
+        return <div style={{ padding: '16px 0' }} />;
     };
 
     const getContent = () => {
@@ -877,33 +853,6 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
                                         />
                                     ))}
                                 </div>
-                            )}
-                            {enableSignUpWithEmail && !serverError && (
-                                <p className='signup-body-card-agreement'>
-                                    <FormattedMessage
-                                        id='signup.agreement'
-                                        defaultMessage='By proceeding to create your account and use {siteName}, you agree to our <termsOfUseLink>Terms of Use</termsOfUseLink> and <privacyPolicyLink>Privacy Policy</privacyPolicyLink>.  If you do not agree, you cannot use {siteName}.'
-                                        values={{
-                                            siteName: SiteName,
-                                            termsOfUseLink: (chunks) => (
-                                                <ExternalLink
-                                                    href={TermsOfServiceLink as string}
-                                                    location='signup-terms-of-use'
-                                                >
-                                                    {chunks}
-                                                </ExternalLink>
-                                            ),
-                                            privacyPolicyLink: (chunks) => (
-                                                <ExternalLink
-                                                    href={PrivacyPolicyLink as string}
-                                                    location='signup-privacy-policy'
-                                                >
-                                                    {chunks}
-                                                </ExternalLink>
-                                            ),
-                                        }}
-                                    />
-                                </p>
                             )}
                         </div>
                     </div>

@@ -4,7 +4,7 @@
 import classNames from 'classnames';
 import throttle from 'lodash/throttle';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useIntl } from 'react-intl';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { useSelector, useDispatch } from 'react-redux';
 import { useLocation, useHistory, Route } from 'react-router-dom';
 
@@ -101,6 +101,8 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
         OpenIdButtonColor,
         EnableCustomBrand,
         CustomBrandText,
+        // TermsOfServiceLink,
+        // PrivacyPolicyLink,
     } = config;
     const { IsLicensed } = useSelector(getLicense);
     const loggedIn = Boolean(useSelector(getCurrentUserId));
@@ -610,7 +612,7 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
                     onChange={() => setSubscribeToSecurityNewsletter(!subscribeToSecurityNewsletter)}
                     text={
                         formatMessage(
-                            { id: 'newsletter_optin.checkmark.text', defaultMessage: '<span>I would like to receive security updates via newsletter.</span> By subscribing, I consent to receive emails with product updates, promotions, and company news. I have read the <a>Privacy Policy</a> and understand that I can <aa>unsubscribe</aa> at any time' },
+                            { id: 'newsletter_optin.checkmark.text', defaultMessage: '<span>I would like to receive Oktel security updates via newsletter.</span> By subscribing, I consent to receive emails with product updates, promotions, and company news. I have read the <a>Privacy Policy</a> and understand that I can <aa>unsubscribe</aa> at any time' },
                             {
                                 a: (chunks: React.ReactNode | React.ReactNodeArray) => (
                                     <ExternalLink
@@ -637,7 +639,29 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
                 />
             );
         }
-        return <div style={{ padding: '16px 0' }} />;
+        return (
+            <div className='newsletter'>
+                {/* <span className='interested'>
+                    {formatMessage({ id: 'newsletter_optin.title', defaultMessage: 'Interested in receiving Oktel security, product, promotions, and company updates updates via newsletter?' })}
+                </span>
+                <span className='link'>
+                    {formatMessage(
+                        { id: 'newsletter_optin.desc', defaultMessage: 'Sign up at <a>{link}</a>.' },
+                        {
+                            link: HostedCustomerLinks.SECURITY_UPDATES,
+                            a: (chunks: React.ReactNode | React.ReactNodeArray) => (
+                                <ExternalLink
+                                    location='signup'
+                                    href={HostedCustomerLinks.SECURITY_UPDATES}
+                                >
+                                    {chunks}
+                                </ExternalLink>
+                            ),
+                        },
+                    )}
+                </span> */}
+            </div>
+        );
     };
 
     const getContent = () => {
@@ -854,6 +878,34 @@ const Signup = ({ onCustomizeHeader }: SignupProps) => {
                                     ))}
                                 </div>
                             )}
+
+                            {/* {enableSignUpWithEmail && !serverError && (
+                                <p className='signup-body-card-agreement'>
+                                    <FormattedMessage
+                                        id='signup.agreement'
+                                        defaultMessage='By proceeding to create your account and use {siteName}, you agree to our <termsOfUseLink>Terms of Use</termsOfUseLink> and <privacyPolicyLink>Privacy Policy</privacyPolicyLink>.  If you do not agree, you cannot use {siteName}.'
+                                        values={{
+                                            siteName: SiteName,
+                                            termsOfUseLink: (chunks) => (
+                                                <ExternalLink
+                                                    href={TermsOfServiceLink as string}
+                                                    location='signup-terms-of-use'
+                                                >
+                                                    {chunks}
+                                                </ExternalLink>
+                                            ),
+                                            privacyPolicyLink: (chunks) => (
+                                                <ExternalLink
+                                                    href={PrivacyPolicyLink as string}
+                                                    location='signup-privacy-policy'
+                                                >
+                                                    {chunks}
+                                                </ExternalLink>
+                                            ),
+                                        }}
+                                    />
+                                </p>
+                            )} */}
                         </div>
                     </div>
                 </div>

@@ -125,10 +125,10 @@ func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+	writeJSON(w, ActionResponse{EphemeralText: msg})
 }
 
-// HandleBreakStart handles the break start button.
+// HandleBreakStart opens a dialog asking for break reason.
 func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Request) {
 	var req ActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -136,12 +136,58 @@ func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	msg, err := h.svc.BreakStart(r.Context(), req.UserID, req.UserName)
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/break",
+		Dialog: mattermost.Dialog{
+			Title:       "Start Break",
+			SubmitLabel: "Start",
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: "Reason",
+					Name:        "reason",
+					Type:        "text",
+					Placeholder: "e.g. Lunch, Coffee, ...",
+				},
+			},
+		},
+	})
 	if err != nil {
-		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		log.Printf("ERROR open break dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form. Please try again."})
 		return
 	}
-	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleBreakSubmit processes the break dialog submission.
+func (h *AttendanceHandler) HandleBreakSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	username := sub.UserName
+	if username == "" {
+		user, err := h.mm.GetUser(sub.UserID)
+		if err == nil {
+			username = user.Username
+		}
+	}
+
+	msg, err := h.svc.BreakStart(r.Context(), sub.UserID, username, sub.Submission["reason"])
+	if err != nil {
+		log.Printf("ERROR break start: %v", err)
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	_ = msg
+	w.WriteHeader(http.StatusOK)
 }
 
 // HandleBreakEnd handles the break end button.
@@ -157,7 +203,7 @@ func (h *AttendanceHandler) HandleBreakEnd(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+	writeJSON(w, ActionResponse{EphemeralText: msg})
 }
 
 // HandleCheckOut handles the check-out button.
@@ -173,7 +219,7 @@ func (h *AttendanceHandler) HandleCheckOut(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{Update: &ActionUpdate{Message: msg}})
+	writeJSON(w, ActionResponse{EphemeralText: msg})
 }
 
 // HandleLeaveForm opens the leave request dialog.
@@ -277,13 +323,17 @@ func (h *AttendanceHandler) HandleApprove(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.svc.ApproveLeave(r.Context(), requestID, req.UserID, req.UserName); err != nil {
+	msg, err := h.svc.ApproveLeave(r.Context(), requestID, req.UserID, req.UserName)
+	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
 
 	writeJSON(w, ActionResponse{
-		Update: &ActionUpdate{Message: "Processing..."},
+		Update: &ActionUpdate{
+			Message: msg,
+			Props:   &mattermost.Props{Attachments: []mattermost.Attachment{}},
+		},
 	})
 }
 
@@ -301,13 +351,17 @@ func (h *AttendanceHandler) HandleReject(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.svc.RejectLeave(r.Context(), requestID, req.UserID, req.UserName, ""); err != nil {
+	msg, err := h.svc.RejectLeave(r.Context(), requestID, req.UserID, req.UserName, "")
+	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
 
 	writeJSON(w, ActionResponse{
-		Update: &ActionUpdate{Message: "Processing..."},
+		Update: &ActionUpdate{
+			Message: msg,
+			Props:   &mattermost.Props{Attachments: []mattermost.Attachment{}},
+		},
 	})
 }
 
@@ -316,6 +370,7 @@ func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
 	mux.HandleFunc("POST /api/attendance/checkin", h.HandleCheckIn)
 	mux.HandleFunc("POST /api/attendance/break-start", h.HandleBreakStart)
+	mux.HandleFunc("POST /api/attendance/break", h.HandleBreakSubmit)
 	mux.HandleFunc("POST /api/attendance/break-end", h.HandleBreakEnd)
 	mux.HandleFunc("POST /api/attendance/checkout", h.HandleCheckOut)
 	mux.HandleFunc("POST /api/attendance/leave-form", h.HandleLeaveForm)

@@ -26,13 +26,14 @@ func NewClient(baseURL, botToken string) *Client {
 type Post struct {
 	ID        string `json:"id,omitempty"`
 	ChannelID string `json:"channel_id"`
+	RootID    string `json:"root_id,omitempty"`
 	Message   string `json:"message"`
 	Props     Props  `json:"props,omitempty"`
 }
 
 // Props holds post properties including attachments.
 type Props struct {
-	Attachments []Attachment `json:"attachments,omitempty"`
+	Attachments []Attachment `json:"attachments"`
 }
 
 // Attachment represents a Mattermost message attachment.
@@ -148,6 +149,21 @@ func (c *Client) GetChannelByName(teamID, channelName string) (string, error) {
 		return "", fmt.Errorf("get channel by name: %w", err)
 	}
 	return channel.ID, nil
+}
+
+// GetUser retrieves a user's info by ID.
+func (c *Client) GetUser(userID string) (*UserInfo, error) {
+	var info UserInfo
+	if err := c.doJSON("GET", "/api/v4/users/"+userID, nil, &info); err != nil {
+		return nil, fmt.Errorf("get user: %w", err)
+	}
+	return &info, nil
+}
+
+// UserInfo holds basic user information.
+type UserInfo struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
 }
 
 // GetChannel retrieves channel info by ID.

@@ -7,7 +7,6 @@
     display: flex;
     flex-direction: column;
     padding-bottom: 32px;
-    margin: auto;
 
     .login-body-action {
         display: flex;
@@ -29,12 +28,17 @@
         flex: 1;
         align-items: center;
         justify-content: center;
+        padding: 0 60px;
 
         .login-body-message-subtitle {
-            color: rgba(var(--center-channel-color-rgb), 0.75);
-            font-size: 18px;
+            position: relative;
+            z-index: 1;
+            color: #FFFFFF;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 20px;
             font-weight: 400;
-            line-height: 28px;
+            line-height: 24px;
+            letter-spacing: 0%;
         }
 
         .login-body-message {
@@ -42,15 +46,34 @@
             width: 540px;
             flex-flow: column;
             align-self: flex-start;
+            position: relative;
 
             .login-body-message-title {
-                padding-right: 24px;
-                color: var(--title-color-indigo-500);
-                font-family: Metropolis;
-                font-size: 80px;
+                position: relative;
+                z-index: 1;
+                color: #FFFFFF;
+                font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+                font-size: 40px;
                 font-weight: 600;
-                letter-spacing: -0.01em;
-                line-height: 88px;
+                line-height: 40px;
+                letter-spacing: 0%;
+            }
+
+            .auth-page-gradient {
+                position: fixed;
+                top: 0;
+                left: 10%;
+                width: 1000px;
+                height: 100vh;
+                transform: translateX(-50%);
+                object-fit: cover;
+                z-index: 0;
+                pointer-events: none;
+                opacity: 0.3;
+
+                @media (max-width: 1199px) {
+                    left: 50%;
+                }
             }
 
             .login-body-message-svg {
@@ -79,6 +102,8 @@
                 }
 
                 .login-body-custom-branding-image {
+                    position: relative;
+                    z-index: 1;
                     max-height: 240px;
                     align-self: self-start;
                     border-radius: 8px;
@@ -86,19 +111,18 @@
                 }
             }
 
-            &.with-alternate-link {
-                margin-top: 40px;
-            }
         }
 
         .login-body-card {
+            position: relative;
+            z-index: 1;
             width: 540px;
             box-sizing: border-box;
-            border: 1px solid rgba(var(--center-channel-color-rgb), 0.08);
-            border-radius: 8px;
+            border: none;
+            border-radius: 20px 20px 0 0;
             margin-left: 60px;
-            background-color: var(--center-channel-bg);
-            box-shadow: var(--elevation-5);
+            background-color: #FFFFFF;
+            box-shadow: none;
 
             &.with-error {
                 @include mixins.shake-horizontally;
@@ -112,13 +136,46 @@
                 border: none;
                 box-shadow: none;
 
+                .login-body-card-tabs {
+                    display: flex;
+                    justify-content: center;
+                    gap: 12px;
+                    margin-bottom: 24px;
+                    padding-bottom: 16px;
+                    border-bottom: 1px solid #E0E0E0;
+
+                    .login-body-card-tab {
+                        padding: 10px 24px;
+                        background-color: transparent;
+                        border: none;
+                        border-radius: 8px;
+                        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+                        font-size: 16px;
+                        font-weight: 500;
+                        color: #2D2D2D;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+
+                        &:hover {
+                            background-color: #F5F5F5;
+                        }
+
+                        &.active {
+                            background-color: #2D2D2D;
+                            color: #FFFFFF;
+                        }
+                    }
+                }
+
                 .login-body-card-title {
-                    color: var(--center-channel-color);
-                    font-family: 'Metropolis';
-                    font-size: 22px;
+                    color: #2D2D2D;
+                    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+                    font-size: 40px;
                     font-style: normal;
                     font-weight: 600;
-                    line-height: 28px;
+                    line-height: 40px;
+                    letter-spacing: 0%;
+                    display: none; // Hide since we're using tabs instead
                 }
 
                 .login-body-custom-branding-markdown,
@@ -140,11 +197,21 @@
                     }
 
                     .login-body-card-form-link {
-                        display: inline-flex;
+                        display: flex;
+                        justify-content: flex-end;
+                        align-items: center;
                         margin-top: 17px;
+                        width: 100%;
 
                         a {
-                            @include mixins.link;
+                            color: #2D2D2D;
+                            font-size: 14px;
+                            text-decoration: none;
+                            font-weight: 500;
+
+                            &:hover {
+                                text-decoration: underline;
+                            }
                         }
                     }
 
@@ -154,6 +221,20 @@
 
                         width: 100%;
                         margin-top: 30px;
+                        background-color: #2D2D2D;
+                        border-color: transparent;
+                        border-radius: 8px;
+                        color: #FFFFFF;
+
+                        &:hover:not(:disabled) {
+                            background-color: #1A1A1A;
+                            border-color: transparent;
+                        }
+
+                        &:disabled {
+                            opacity: 0.6;
+                            cursor: not-allowed;
+                        }
                     }
                 }
 
@@ -192,15 +273,17 @@
         }
 
         .login-body-custom-branding-markdown {
+            position: relative;
+            z-index: 1;
             flex: 1;
 
-            ul + p,
-            ol + p {
+            ul+p,
+            ol+p {
                 margin-top: 0.6em;
             }
 
-            p + ul,
-            p + ol {
+            p+ul,
+            p+ol {
                 margin-top: 0.6em;
             }
 
@@ -224,6 +307,7 @@
 
 @media screen and (min-width: 1680px) {
     .login-body .login-body-content {
+
         .login-body-message,
         .login-body-card {
             width: 610px;
@@ -238,26 +322,31 @@
 
 @media screen and (max-width: 1199px) {
     .login-body {
+
         .login-body-alternate-link {
             padding-right: 24px;
         }
 
         .login-body-content {
             flex-direction: column;
+            min-width: 375px;
+            padding: 0 24px;
 
             .login-body-message,
             .login-body-card {
-                width: 640px;
+                width: 100%;
+                max-width: 800px;
             }
 
             .login-body-message {
                 align-self: center;
-                padding: 24px;
+                padding: 64px 24px;
+                text-align: center;
 
                 .login-body-message-title {
-                    padding-right: 80px;
-                    font-size: 64px;
-                    line-height: 76px;
+                    padding-right: 0;
+                    font-size: 45px;
+                    line-height: 56px;
                 }
 
                 .login-body-message-subtitle {
@@ -276,7 +365,7 @@
             .login-body-card {
                 border: none;
                 margin: 0;
-                background-color: unset;
+                background-color: #FFFFFF;
                 box-shadow: none;
 
                 .login-body-card-content {
@@ -300,54 +389,28 @@
                             background-color: var(--center-channel-bg);
                         }
                     }
-                }
 
-                &.custom-branding {
-                    .login-body-card-content {
-                        .login-body-card-title {
-                            display: block;
-                            margin-bottom: 24px;
-                            font-size: 32px;
-                            line-height: 40px;
+                    &.custom-branding {
+                        .login-body-card-content {
+                            .login-body-card-title {
+                                display: block;
+                                margin-bottom: 24px;
+                                font-size: 32px;
+                                line-height: 40px;
 
-                            &:has(+ .login-body-custom-branding-markdown){
-                                margin-bottom: 12px;
+                                &:has(+ .login-body-custom-branding-markdown) {
+                                    margin-bottom: 12px;
+                                }
+                            }
+
+                            .login-body-custom-branding-markdown,
+                            .login-body-message-subtitle {
+                                display: block;
+                                margin: 0 0 32px;
+                                text-align: left;
                             }
                         }
-
-                        .login-body-custom-branding-markdown,
-                        .login-body-message-subtitle {
-                            display: block;
-                            margin: 0 0 32px;
-                            text-align: left;
-                        }
                     }
-                }
-            }
-        }
-    }
-}
-
-@media screen and (max-width: 699px) {
-    .login-body {
-        margin: auto 0;
-
-        .login-body-content {
-            min-width: 375px;
-
-            .login-body-card {
-                width: 100%;
-            }
-
-            .login-body-message {
-                width: auto;
-                align-self: flex-start;
-                padding: 24px;
-
-                .login-body-message-title {
-                    padding-right: 0;
-                    font-size: 45px;
-                    line-height: 56px;
                 }
             }
         }

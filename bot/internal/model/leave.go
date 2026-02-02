@@ -18,7 +18,6 @@ const (
 
 type LeaveRequest struct {
 	ID                bson.ObjectID `bson:"_id,omitempty" json:"id"`
-	RequestID         string        `bson:"request_id" json:"request_id"` // LR-YYYYMMDDNN
 	UserID            string        `bson:"user_id" json:"user_id"`
 	Username          string        `bson:"username" json:"username"`
 	ChannelID         string        `bson:"channel_id" json:"channel_id"`

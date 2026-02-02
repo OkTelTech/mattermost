@@ -7,6 +7,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"oktel-bot/internal/model"
 )
@@ -16,11 +17,26 @@ type AttendanceStore struct {
 	leave      *mongo.Collection
 }
 
-func NewAttendanceStore(db *MongoDB) *AttendanceStore {
-	return &AttendanceStore{
-		attendance: db.Collection("attendance"),
-		leave:      db.Collection("leave_requests"),
+func NewAttendanceStore(ctx context.Context, db *MongoDB) (*AttendanceStore, error) {
+	attendance := db.Collection("attendance")
+	leave := db.Collection("leave_requests")
+
+	if _, err := attendance.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "user_id", Value: 1}, {Key: "date", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("create attendance indexes: %w", err)
 	}
+
+	if _, err := leave.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "status", Value: 1}}},
+	}); err != nil {
+		return nil, fmt.Errorf("create leave_requests indexes: %w", err)
+	}
+
+	return &AttendanceStore{attendance: attendance, leave: leave}, nil
 }
 
 // GetTodayRecord returns today's attendance record for a user, or nil if not found.
@@ -39,12 +55,16 @@ func (s *AttendanceStore) GetTodayRecord(ctx context.Context, userID, date strin
 	return &record, nil
 }
 
-// CreateRecord inserts a new attendance record.
+// CreateRecord inserts a new attendance record and sets the ID on the struct.
 func (s *AttendanceStore) CreateRecord(ctx context.Context, record *model.AttendanceRecord) error {
 	record.CreatedAt = time.Now()
 	record.UpdatedAt = time.Now()
-	_, err := s.attendance.InsertOne(ctx, record)
-	return err
+	res, err := s.attendance.InsertOne(ctx, record)
+	if err != nil {
+		return err
+	}
+	record.ID = res.InsertedID.(bson.ObjectID)
+	return nil
 }
 
 // UpdateRecord updates an existing attendance record.
@@ -54,18 +74,22 @@ func (s *AttendanceStore) UpdateRecord(ctx context.Context, record *model.Attend
 	return err
 }
 
-// CreateLeaveRequest inserts a new leave request.
+// CreateLeaveRequest inserts a new leave request and sets the ID on the struct.
 func (s *AttendanceStore) CreateLeaveRequest(ctx context.Context, req *model.LeaveRequest) error {
 	req.CreatedAt = time.Now()
 	req.UpdatedAt = time.Now()
-	_, err := s.leave.InsertOne(ctx, req)
-	return err
+	res, err := s.leave.InsertOne(ctx, req)
+	if err != nil {
+		return err
+	}
+	req.ID = res.InsertedID.(bson.ObjectID)
+	return nil
 }
 
-// GetLeaveRequest retrieves a leave request by its request ID.
-func (s *AttendanceStore) GetLeaveRequest(ctx context.Context, requestID string) (*model.LeaveRequest, error) {
+// GetLeaveRequestByID retrieves a leave request by its ObjectID.
+func (s *AttendanceStore) GetLeaveRequestByID(ctx context.Context, id bson.ObjectID) (*model.LeaveRequest, error) {
 	var req model.LeaveRequest
-	err := s.leave.FindOne(ctx, bson.M{"request_id": requestID}).Decode(&req)
+	err := s.leave.FindOne(ctx, bson.M{"_id": id}).Decode(&req)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
@@ -80,12 +104,4 @@ func (s *AttendanceStore) UpdateLeaveRequest(ctx context.Context, req *model.Lea
 	req.UpdatedAt = time.Now()
 	_, err := s.leave.ReplaceOne(ctx, bson.M{"_id": req.ID}, req)
 	return err
-}
-
-// CountTodayLeaveRequests returns the number of leave requests created today (for generating request ID).
-func (s *AttendanceStore) CountTodayLeaveRequests(ctx context.Context, date string) (int64, error) {
-	count, err := s.leave.CountDocuments(ctx, bson.M{
-		"request_id": bson.M{"$regex": fmt.Sprintf("^LR-%s", date)},
-	})
-	return count, err
 }

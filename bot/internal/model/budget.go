@@ -8,7 +8,6 @@ import (
 
 type BudgetRequest struct {
 	ID                bson.ObjectID `bson:"_id,omitempty" json:"id"`
-	RequestID         string        `bson:"request_id" json:"request_id"` // BR-YYYYMMDDNN
 	ChannelID         string        `bson:"channel_id" json:"channel_id"`
 	ApprovalChannelID string        `bson:"approval_channel_id" json:"approval_channel_id"`
 	PostID            string        `bson:"post_id" json:"post_id"`

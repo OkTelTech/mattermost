@@ -20,20 +20,29 @@ func main() {
 	cfg := config.Load()
 
 	// Connect to MongoDB
+	mainCtx := context.Background()
 	db, err := store.NewMongoDB(cfg.MongoURI, cfg.MongoDB)
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
-	defer db.Close(context.Background())
+	defer db.Close(mainCtx)
 
 	// 2 Mattermost clients - one per bot identity
 	attendanceMM := mattermost.NewClient(cfg.MattermostURL, cfg.AttendanceBotToken)
 	budgetMM := mattermost.NewClient(cfg.MattermostURL, cfg.BudgetBotToken)
 	botURL := cfg.BotURL
 
-	// Stores
-	attendanceStore := store.NewAttendanceStore(db)
-	budgetStore := store.NewBudgetStore(db)
+	// Stores (indexes are created inside each constructor)
+	initCtx, cancel := context.WithTimeout(mainCtx, 10*time.Second)
+	defer cancel()
+	attendanceStore, err := store.NewAttendanceStore(initCtx, db)
+	if err != nil {
+		log.Fatalf("Failed to init attendance store: %v", err)
+	}
+	budgetStore, err := store.NewBudgetStore(initCtx, db)
+	if err != nil {
+		log.Fatalf("Failed to init budget store: %v", err)
+	}
 
 	// Services
 	attendanceSvc := service.NewAttendanceService(attendanceStore, attendanceMM, botURL)

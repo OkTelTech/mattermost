@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
 	"oktel-bot/internal/store"
@@ -24,27 +26,20 @@ func NewAttendanceService(store *store.AttendanceStore, mm *mattermost.Client, b
 
 func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID string) (string, error) {
 	now := time.Now()
-	date := now.Format("2006-01-02")
+	date := now.Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
 		return "", fmt.Errorf("get today record: %w", err)
 	}
 	if record != nil {
-		return "", fmt.Errorf("@%s already checked in today at %s", username, record.CheckIn.Format("15:04"))
-	}
-
-	msg := fmt.Sprintf("@%s checked in at %s", username, now.Format("15:04"))
-	post, err := s.mm.CreatePost(&mattermost.Post{ChannelID: channelID, Message: msg})
-	if err != nil {
-		return "", fmt.Errorf("create post: %w", err)
+		return "", fmt.Errorf("@%s already checked in today at %s", username, record.CheckIn.Format(time.TimeOnly))
 	}
 
 	record = &model.AttendanceRecord{
 		UserID:    userID,
 		Username:  username,
 		ChannelID: channelID,
-		PostID:    post.ID,
 		Date:      date,
 		CheckIn:   &now,
 		Status:    model.StatusWorking,
@@ -53,12 +48,23 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return "", fmt.Errorf("create record: %w", err)
 	}
 
+	msg := fmt.Sprintf("@%s checked in at %s", username, now.Format(time.TimeOnly))
+	post, err := s.mm.CreatePost(&mattermost.Post{ChannelID: channelID, Message: msg})
+	if err != nil {
+		return "", fmt.Errorf("create post: %w", err)
+	}
+
+	record.PostID = post.ID
+	if err := s.store.UpdateRecord(ctx, record); err != nil {
+		return "", fmt.Errorf("update record: %w", err)
+	}
+
 	return msg, nil
 }
 
 func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, reason string) (string, error) {
 	now := time.Now()
-	date := now.Format("2006-01-02")
+	date := now.Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -83,14 +89,14 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 		return "", err
 	}
 
-	msg := fmt.Sprintf("@%s started break at %s — %s", username, now.Format("15:04"), reason)
+	msg := fmt.Sprintf("@%s started break at %s — %s", username, now.Format(time.TimeOnly), reason)
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }
 
 func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username string) (string, error) {
 	now := time.Now()
-	date := now.Format("2006-01-02")
+	date := now.Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -112,14 +118,14 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 	}
 
 	duration := now.Sub(last.Start).Round(time.Minute)
-	msg := fmt.Sprintf("@%s ended break at %s (break: %s)", username, now.Format("15:04"), duration)
+	msg := fmt.Sprintf("@%s ended break at %s (break: %s)", username, now.Format(time.TimeOnly), duration)
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }
 
 func (s *AttendanceService) CheckOut(ctx context.Context, userID, username string) (string, error) {
 	now := time.Now()
-	date := now.Format("2006-01-02")
+	date := now.Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -129,7 +135,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		return "", fmt.Errorf("@%s has not checked in today", username)
 	}
 	if record.CheckOut != nil {
-		return "", fmt.Errorf("@%s already checked out at %s", username, record.CheckOut.Format("15:04"))
+		return "", fmt.Errorf("@%s already checked out at %s", username, record.CheckOut.Format(time.TimeOnly))
 	}
 
 	record.CheckOut = &now
@@ -150,21 +156,12 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 
 	workDuration := now.Sub(*record.CheckIn).Round(time.Minute)
 	msg := fmt.Sprintf("@%s checked out at %s (total: %s, breaks: %s)",
-		username, now.Format("15:04"), workDuration, totalBreak.Round(time.Minute))
+		username, now.Format(time.TimeOnly), workDuration, totalBreak.Round(time.Minute))
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }
 
 func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID, leaveType, startDate, endDate, reason string) error {
-	now := time.Now()
-	date := now.Format("20060102")
-
-	count, err := s.store.CountTodayLeaveRequests(ctx, date)
-	if err != nil {
-		return fmt.Errorf("count today requests: %w", err)
-	}
-	requestID := fmt.Sprintf("LR-%s%02d", date, count+1)
-
 	// Lookup username if not provided (dialog submissions may omit it)
 	if username == "" {
 		user, err := s.mm.GetUser(userID)
@@ -179,9 +176,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		return fmt.Errorf("calc days: %w", err)
 	}
 
-	leaveTypeName := leaveTypeLabel(leaveType)
-
-	// Resolve approval channel FIRST before creating any posts
+	// Resolve approval channel before creating any posts
 	channelInfo, err := s.mm.GetChannel(channelID)
 	if err != nil {
 		return fmt.Errorf("get channel info: %w", err)
@@ -193,9 +188,28 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		return fmt.Errorf("get approval channel '%s': %w", approvalChannelName, err)
 	}
 
-	// Post info message to main channel (no buttons)
+	// Create DB record first to get the ID
+	req := &model.LeaveRequest{
+		UserID:            userID,
+		Username:          username,
+		ChannelID:         channelID,
+		ApprovalChannelID: approvalChannelID,
+		Type:              leaveType,
+		StartDate:         startDate,
+		EndDate:           endDate,
+		Days:              days,
+		Reason:            reason,
+		Status:            model.LeaveStatusPending,
+	}
+	if err := s.store.CreateLeaveRequest(ctx, req); err != nil {
+		return fmt.Errorf("create leave request: %w", err)
+	}
+
+	idHex := req.ID.Hex()
+	leaveTypeName := leaveTypeLabel(leaveType)
 	infoMsg := formatLeaveMsg(username, leaveTypeName, startDate, endDate, days, reason, "Pending", "")
 
+	// Post info message to main channel (no buttons)
 	infoPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: channelID,
 		Message:   infoMsg,
@@ -217,7 +231,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 						Integration: mattermost.Integration{
 							URL: s.botURL + "/api/attendance/approve",
 							Context: map[string]any{
-								"request_id": requestID,
+								"request_id": idHex,
 							},
 						},
 					},
@@ -227,7 +241,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 						Integration: mattermost.Integration{
 							URL: s.botURL + "/api/attendance/reject",
 							Context: map[string]any{
-								"request_id": requestID,
+								"request_id": idHex,
 							},
 						},
 					},
@@ -239,34 +253,27 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		return fmt.Errorf("post approval message: %w", err)
 	}
 
-	req := &model.LeaveRequest{
-		RequestID:         requestID,
-		UserID:            userID,
-		Username:          username,
-		ChannelID:         channelID,
-		ApprovalChannelID: approvalChannelID,
-		PostID:            infoPost.ID,
-		ApprovalPostID:    approvalPost.ID,
-		Type:              leaveType,
-		StartDate:         startDate,
-		EndDate:           endDate,
-		Days:              days,
-		Reason:            reason,
-		Status:            model.LeaveStatusPending,
-	}
-	return s.store.CreateLeaveRequest(ctx, req)
+	// Update record with post IDs
+	req.PostID = infoPost.ID
+	req.ApprovalPostID = approvalPost.ID
+	return s.store.UpdateLeaveRequest(ctx, req)
 }
 
 func (s *AttendanceService) ApproveLeave(ctx context.Context, requestID, approverID, approverUsername string) (string, error) {
-	req, err := s.store.GetLeaveRequest(ctx, requestID)
+	id, err := bson.ObjectIDFromHex(requestID)
+	if err != nil {
+		return "", fmt.Errorf("invalid request ID: %w", err)
+	}
+
+	req, err := s.store.GetLeaveRequestByID(ctx, id)
 	if err != nil {
 		return "", fmt.Errorf("get leave request: %w", err)
 	}
 	if req == nil {
-		return "", fmt.Errorf("leave request %s not found", requestID)
+		return "", fmt.Errorf("leave request not found")
 	}
 	if req.Status != model.LeaveStatusPending {
-		return "", fmt.Errorf("request %s is already %s", requestID, req.Status)
+		return "", fmt.Errorf("request is already %s", req.Status)
 	}
 	if req.UserID == approverID {
 		return "", fmt.Errorf("cannot approve your own request")
@@ -284,7 +291,7 @@ func (s *AttendanceService) ApproveLeave(ctx context.Context, requestID, approve
 
 	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type),
 		req.StartDate, req.EndDate, req.Days, req.Reason,
-		"**APPROVED**", fmt.Sprintf("| **Approved by** | @%s at %s |", approverUsername, now.Format("15:04")))
+		"**APPROVED**", fmt.Sprintf("| **Approved by** | @%s at %s |", approverUsername, now.Format(time.TimeOnly)))
 
 	// Update info post in main channel
 	s.mm.UpdatePost(req.PostID, &mattermost.Post{
@@ -300,15 +307,20 @@ func (s *AttendanceService) ApproveLeave(ctx context.Context, requestID, approve
 }
 
 func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecterID, rejecterUsername, reason string) (string, error) {
-	req, err := s.store.GetLeaveRequest(ctx, requestID)
+	id, err := bson.ObjectIDFromHex(requestID)
+	if err != nil {
+		return "", fmt.Errorf("invalid request ID: %w", err)
+	}
+
+	req, err := s.store.GetLeaveRequestByID(ctx, id)
 	if err != nil {
 		return "", fmt.Errorf("get leave request: %w", err)
 	}
 	if req == nil {
-		return "", fmt.Errorf("leave request %s not found", requestID)
+		return "", fmt.Errorf("leave request not found")
 	}
 	if req.Status != model.LeaveStatusPending {
-		return "", fmt.Errorf("request %s is already %s", requestID, req.Status)
+		return "", fmt.Errorf("request is already %s", req.Status)
 	}
 	if req.UserID == rejecterID {
 		return "", fmt.Errorf("cannot reject your own request")
@@ -327,7 +339,7 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 
 	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type),
 		req.StartDate, req.EndDate, req.Days, req.Reason,
-		"**REJECTED**", fmt.Sprintf("| **Rejected by** | @%s at %s |", rejecterUsername, now.Format("15:04")))
+		"**REJECTED**", fmt.Sprintf("| **Rejected by** | @%s at %s |", rejecterUsername, now.Format(time.TimeOnly)))
 
 	// Update info post in main channel
 	s.mm.UpdatePost(req.PostID, &mattermost.Post{

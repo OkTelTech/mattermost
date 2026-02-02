@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
 	"oktel-bot/internal/store"
@@ -22,15 +24,6 @@ func NewBudgetService(store *store.BudgetStore, mm *mattermost.Client, botURL st
 
 // CreateRequest handles step 1: Sale creates a budget request.
 func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, campaign, partner, purpose, deadline string, amount float64) error {
-	now := time.Now()
-	date := now.Format("20060102")
-
-	count, err := s.store.CountTodayRequests(ctx, date)
-	if err != nil {
-		return fmt.Errorf("count today requests: %w", err)
-	}
-	requestID := fmt.Sprintf("BR-%s%02d", date, count+1)
-
 	channelInfo, err := s.mm.GetChannel(channelID)
 	if err != nil {
 		return fmt.Errorf("get channel info: %w", err)
@@ -41,7 +34,25 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, ca
 		return fmt.Errorf("get approval channel '%s': %w", approvalChannelName, err)
 	}
 
-	infoMsg := formatBudgetMsg(requestID, campaign, partner, amount, purpose, deadline, 1)
+	// Create DB record first to get the ID
+	req := &model.BudgetRequest{
+		ChannelID:         channelID,
+		ApprovalChannelID: approvalChannelID,
+		CurrentStep:       1,
+		Status:            "step1",
+		SaleUserID:        userID,
+		Campaign:          campaign,
+		Partner:           partner,
+		Amount:            amount,
+		Purpose:           purpose,
+		Deadline:          deadline,
+	}
+	if err := s.store.Create(ctx, req); err != nil {
+		return fmt.Errorf("create budget request: %w", err)
+	}
+
+	idHex := req.ID.Hex()
+	infoMsg := formatBudgetMsg(campaign, partner, amount, purpose, deadline, 1)
 
 	infoPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: channelID,
@@ -61,7 +72,7 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, ca
 					Type: "button",
 					Integration: mattermost.Integration{
 						URL:     s.botURL + "/api/budget/step2-form",
-						Context: map[string]any{"request_id": requestID},
+						Context: map[string]any{"request_id": idHex},
 					},
 				}},
 			}},
@@ -71,22 +82,10 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, ca
 		return fmt.Errorf("post approval message: %w", err)
 	}
 
-	req := &model.BudgetRequest{
-		RequestID:         requestID,
-		ChannelID:         channelID,
-		ApprovalChannelID: approvalChannelID,
-		PostID:            infoPost.ID,
-		ApprovalPostID:    approvalPost.ID,
-		CurrentStep:       1,
-		Status:            "step1",
-		SaleUserID:        userID,
-		Campaign:          campaign,
-		Partner:           partner,
-		Amount:            amount,
-		Purpose:           purpose,
-		Deadline:          deadline,
-	}
-	return s.store.Create(ctx, req)
+	// Update record with post IDs
+	req.PostID = infoPost.ID
+	req.ApprovalPostID = approvalPost.ID
+	return s.store.Update(ctx, req)
 }
 
 // SubmitStep2 handles Partner submitting content info.
@@ -204,8 +203,8 @@ func (s *BudgetService) CompleteStep7(ctx context.Context, requestID, transactio
 		return err
 	}
 
-	completedMsg := fmt.Sprintf("**BUDGET REQUEST #%s - COMPLETED**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Transaction | %s |\n| Status | **COMPLETED** |",
-		req.RequestID, req.Campaign, req.Partner, req.Amount, transactionCode)
+	completedMsg := fmt.Sprintf("**BUDGET REQUEST - COMPLETED**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Transaction | %s |\n| Status | **COMPLETED** |",
+		req.Campaign, req.Partner, req.Amount, transactionCode)
 
 	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
@@ -221,15 +220,20 @@ func (s *BudgetService) CompleteStep7(ctx context.Context, requestID, transactio
 
 // RejectRequest rejects a budget request at any step.
 func (s *BudgetService) RejectRequest(ctx context.Context, requestID, userID string) error {
-	req, err := s.store.GetByRequestID(ctx, requestID)
+	id, err := bson.ObjectIDFromHex(requestID)
+	if err != nil {
+		return fmt.Errorf("invalid request ID: %w", err)
+	}
+
+	req, err := s.store.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
 	if req == nil {
-		return fmt.Errorf("budget request %s not found", requestID)
+		return fmt.Errorf("budget request not found")
 	}
 	if req.Status == "completed" || req.Status == "rejected" {
-		return fmt.Errorf("request %s is already %s", requestID, req.Status)
+		return fmt.Errorf("request is already %s", req.Status)
 	}
 
 	req.Status = "rejected"
@@ -237,8 +241,8 @@ func (s *BudgetService) RejectRequest(ctx context.Context, requestID, userID str
 		return err
 	}
 
-	rejectedMsg := fmt.Sprintf("**BUDGET REQUEST #%s - REJECTED**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Status | **REJECTED** at step %d |",
-		req.RequestID, req.Campaign, req.Partner, req.Amount, req.CurrentStep)
+	rejectedMsg := fmt.Sprintf("**BUDGET REQUEST - REJECTED**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Status | **REJECTED** at step %d |",
+		req.Campaign, req.Partner, req.Amount, req.CurrentStep)
 
 	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
@@ -253,21 +257,27 @@ func (s *BudgetService) RejectRequest(ctx context.Context, requestID, userID str
 }
 
 func (s *BudgetService) getAndValidate(ctx context.Context, requestID string, expectedStep int) (*model.BudgetRequest, error) {
-	req, err := s.store.GetByRequestID(ctx, requestID)
+	id, err := bson.ObjectIDFromHex(requestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request ID: %w", err)
+	}
+
+	req, err := s.store.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if req == nil {
-		return nil, fmt.Errorf("budget request %s not found", requestID)
+		return nil, fmt.Errorf("budget request not found")
 	}
 	if req.CurrentStep != expectedStep {
-		return nil, fmt.Errorf("request %s is at step %d, expected step %d", requestID, req.CurrentStep, expectedStep)
+		return nil, fmt.Errorf("request is at step %d, expected step %d", req.CurrentStep, expectedStep)
 	}
 	return req, nil
 }
 
 func (s *BudgetService) updatePostWithNextStep(req *model.BudgetRequest, completedStep int, nextButtonLabel, nextURL string) error {
-	msg := formatBudgetMsg(req.RequestID, req.Campaign, req.Partner, req.Amount, req.Purpose, req.Deadline, completedStep+1)
+	msg := formatBudgetMsg(req.Campaign, req.Partner, req.Amount, req.Purpose, req.Deadline, completedStep+1)
+	idHex := req.ID.Hex()
 
 	// Update info post (no buttons)
 	s.mm.UpdatePost(req.PostID, &mattermost.Post{
@@ -287,7 +297,7 @@ func (s *BudgetService) updatePostWithNextStep(req *model.BudgetRequest, complet
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + nextURL,
-							Context: map[string]any{"request_id": req.RequestID},
+							Context: map[string]any{"request_id": idHex},
 						},
 					},
 					{
@@ -295,7 +305,7 @@ func (s *BudgetService) updatePostWithNextStep(req *model.BudgetRequest, complet
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + "/api/budget/reject",
-							Context: map[string]any{"request_id": req.RequestID},
+							Context: map[string]any{"request_id": idHex},
 						},
 					},
 				},
@@ -306,7 +316,7 @@ func (s *BudgetService) updatePostWithNextStep(req *model.BudgetRequest, complet
 	return nil
 }
 
-func formatBudgetMsg(requestID, campaign, partner string, amount float64, purpose, deadline string, step int) string {
+func formatBudgetMsg(campaign, partner string, amount float64, purpose, deadline string, step int) string {
 	stepNames := []string{
 		"", "Sale Created", "Partner Content", "TLQC Confirmed",
 		"Payment Info", "Team Lead Approved", "Bank Note Added", "Completed",
@@ -316,6 +326,6 @@ func formatBudgetMsg(requestID, campaign, partner string, amount float64, purpos
 		stepLabel = fmt.Sprintf("Step %d/7 - %s", step, stepNames[step])
 	}
 
-	return fmt.Sprintf("**BUDGET REQUEST #%s**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Purpose | %s |\n| Deadline | %s |\n| Status | %s |",
-		requestID, campaign, partner, amount, purpose, deadline, stepLabel)
+	return fmt.Sprintf("**BUDGET REQUEST**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Purpose | %s |\n| Deadline | %s |\n| Status | %s |",
+		campaign, partner, amount, purpose, deadline, stepLabel)
 }

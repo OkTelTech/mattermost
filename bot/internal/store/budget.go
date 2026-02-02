@@ -15,20 +15,35 @@ type BudgetStore struct {
 	coll *mongo.Collection
 }
 
-func NewBudgetStore(db *MongoDB) *BudgetStore {
-	return &BudgetStore{coll: db.Collection("budget_requests")}
+func NewBudgetStore(ctx context.Context, db *MongoDB) (*BudgetStore, error) {
+	budget := db.Collection("budget_requests")
+
+	if _, err := budget.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "user_id", Value: 1}},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("create budget indexes: %w", err)
+	}
+
+	return &BudgetStore{coll: budget}, nil
 }
 
+// Create inserts a new budget request and sets the ID on the struct.
 func (s *BudgetStore) Create(ctx context.Context, req *model.BudgetRequest) error {
 	req.CreatedAt = time.Now()
 	req.UpdatedAt = time.Now()
-	_, err := s.coll.InsertOne(ctx, req)
-	return err
+	res, err := s.coll.InsertOne(ctx, req)
+	if err != nil {
+		return err
+	}
+	req.ID = res.InsertedID.(bson.ObjectID)
+	return nil
 }
 
-func (s *BudgetStore) GetByRequestID(ctx context.Context, requestID string) (*model.BudgetRequest, error) {
+func (s *BudgetStore) GetByID(ctx context.Context, id bson.ObjectID) (*model.BudgetRequest, error) {
 	var req model.BudgetRequest
-	err := s.coll.FindOne(ctx, bson.M{"request_id": requestID}).Decode(&req)
+	err := s.coll.FindOne(ctx, bson.M{"_id": id}).Decode(&req)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
@@ -42,10 +57,4 @@ func (s *BudgetStore) Update(ctx context.Context, req *model.BudgetRequest) erro
 	req.UpdatedAt = time.Now()
 	_, err := s.coll.ReplaceOne(ctx, bson.M{"_id": req.ID}, req)
 	return err
-}
-
-func (s *BudgetStore) CountTodayRequests(ctx context.Context, date string) (int64, error) {
-	return s.coll.CountDocuments(ctx, bson.M{
-		"request_id": bson.M{"$regex": fmt.Sprintf("^BR-%s", date)},
-	})
 }

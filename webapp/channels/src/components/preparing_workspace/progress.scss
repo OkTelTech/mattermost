@@ -25,12 +25,12 @@
         height: 6px;
         border-radius: 6px;
         margin: 5px 0;
-        background: variables.$primary-color;
-        opacity: 0.2;
+        background: #fff;
+        opacity: 0.3;
 
         &.active {
             opacity: 1;
-            outline: 3px solid color.adjust(variables.$primary-color, $lightness: 50%);
+            outline: 3px solid rgba(255, 255, 255, 0.4);
         }
     }
 

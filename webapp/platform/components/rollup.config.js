@@ -25,7 +25,7 @@ export default [
                 sourcemap: true,
                 file: packagejson.module,
                 format: 'es',
-                globals: {'styled-components': 'styled'},
+                globals: { 'styled-components': 'styled' },
             },
         ],
         plugins: [

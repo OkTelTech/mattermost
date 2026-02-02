@@ -2,6 +2,15 @@
 
 .Plugins__marketplace {
     margin-top: 24px;
+    color: rgba(255, 255, 255, 0.75);
+
+    a {
+        color: #fff;
+
+        &:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+    }
 }
 
 .plugins-skip-btn {

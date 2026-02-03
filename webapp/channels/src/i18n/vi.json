@@ -3686,6 +3686,7 @@
   "plan.self_serve": "Self-serve",
   "pluggable.errorOccurred": "Đã xảy ra lỗi trong plugin {pluginId}.",
   "pluggable.errorRefresh": "Làm mới?",
+  "plugin.upload": "Tin nhắn thoại",
   "post.ariaLabel.attachment": ", 1 tệp đính kèm",
   "post.ariaLabel.attachmentMultiple": ", {attachmentCount} tệp đính kèm",
   "post.ariaLabel.message": "Vào {time} {date}, {authorName} đã viết, {message}",

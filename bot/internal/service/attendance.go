@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -42,7 +43,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		ChannelID: channelID,
 		Date:      date,
 		CheckIn:   &now,
-		Status:    model.StatusWorking,
+		Status:    model.AttendanceStatusWorking,
 	}
 	if err := s.store.CreateRecord(ctx, record); err != nil {
 		return "", fmt.Errorf("create record: %w", err)
@@ -73,10 +74,10 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 	if record == nil {
 		return "", fmt.Errorf("@%s has not checked in today", username)
 	}
-	if record.Status == model.StatusBreak {
+	if record.Status == model.AttendanceStatusBreak {
 		return "", fmt.Errorf("@%s is already on break", username)
 	}
-	if record.Status != model.StatusWorking {
+	if record.Status != model.AttendanceStatusWorking {
 		return "", fmt.Errorf("@%s is not currently working (status: %s)", username, record.Status)
 	}
 
@@ -84,7 +85,7 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 		Start:  now,
 		Reason: reason,
 	})
-	record.Status = model.StatusBreak
+	record.Status = model.AttendanceStatusBreak
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", err
 	}
@@ -105,14 +106,14 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 	if record == nil {
 		return "", fmt.Errorf("@%s has not checked in today", username)
 	}
-	if record.Status != model.StatusBreak {
+	if record.Status != model.AttendanceStatusBreak {
 		return "", fmt.Errorf("@%s is not on break", username)
 	}
 
 	// Close the last open break
 	last := &record.Breaks[len(record.Breaks)-1]
 	last.End = &now
-	record.Status = model.StatusWorking
+	record.Status = model.AttendanceStatusWorking
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", err
 	}
@@ -139,7 +140,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	}
 
 	record.CheckOut = &now
-	record.Status = model.StatusCompleted
+	record.Status = model.AttendanceStatusCompleted
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", err
 	}
@@ -161,7 +162,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	return msg, nil
 }
 
-func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, startDate, endDate, reason, timeStr string) error {
+func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr string) error {
 	// Lookup username if not provided (dialog submissions may omit it)
 	if username == "" {
 		user, err := s.mm.GetUser(userID)
@@ -171,12 +172,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		username = user.Username
 	}
 
-	// For late arrival / early departure: single date, no range needed
-	if leaveType == model.LeaveTypeLateArrival || leaveType == model.LeaveTypeEarlyDeparture {
-		endDate = startDate
-	}
-
-	if err := validateDates(startDate, endDate); err != nil {
+	if err := validateDateList(dates); err != nil {
 		return fmt.Errorf("validate dates: %w", err)
 	}
 
@@ -199,8 +195,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		ChannelID:         channelID,
 		ApprovalChannelID: approvalChannelID,
 		Type:              leaveType,
-		StartDate:         startDate,
-		EndDate:           endDate,
+		Dates:             dates,
 		Reason:            reason,
 		ExpectedTime:      timeStr,
 		Status:            model.LeaveStatusPending,
@@ -211,7 +206,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 
 	idHex := req.ID.Hex()
 	leaveTypeName := leaveTypeLabel(leaveType)
-	infoMsg := formatLeaveMsg(username, leaveTypeName, leaveType, startDate, endDate, reason, timeStr, "Pending", "")
+	infoMsg := formatLeaveMsg(username, leaveTypeName, leaveType, dates, reason, timeStr, "Pending", "")
 
 	// Post info message to main channel (no buttons)
 	infoPost, err := s.mm.CreatePost(&mattermost.Post{
@@ -225,7 +220,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 	// Post approval message to approval channel (with buttons)
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: approvalChannelID,
-		Message:   infoMsg,
+		Message:   "@all\n" + infoMsg,
 		Props: mattermost.Props{
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
@@ -294,18 +289,20 @@ func (s *AttendanceService) ApproveLeave(ctx context.Context, requestID, approve
 	}
 
 	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type), req.Type,
-		req.StartDate, req.EndDate, req.Reason, req.ExpectedTime,
-		"**APPROVED**", fmt.Sprintf("| **Approved by** | @%s at %s |", approverUsername, now.Format(time.TimeOnly)))
+		req.Dates, req.Reason, req.ExpectedTime, "**APPROVED**", "")
 
-	// Update info post in main channel
+	// Update info post in main channel (status only)
 	s.mm.UpdatePost(req.PostID, &mattermost.Post{
 		ChannelID: req.ChannelID,
 		Message:   updatedMsg,
 	})
 
-	// Notify requester via DM
-	s.mm.SendDM(req.UserID, fmt.Sprintf("Your leave request (%s, %s → %s) was **APPROVED** by @%s",
-		leaveTypeLabel(req.Type), req.StartDate, req.EndDate, approverUsername))
+	// Reply in thread to notify requester
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.ChannelID,
+		RootID:    req.PostID,
+		Message:   fmt.Sprintf("@%s your leave request has been **APPROVED** by @%s", req.Username, approverUsername),
+	})
 
 	return updatedMsg, nil
 }
@@ -341,16 +338,10 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 		return "", fmt.Errorf("update leave request: %w", err)
 	}
 
-	extra := fmt.Sprintf("| **Rejected by** | @%s at %s |", rejecterUsername, now.Format(time.TimeOnly))
-	if reason != "" {
-		extra += fmt.Sprintf("\n| **Reject reason** | %s |", reason)
-	}
-
 	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type), req.Type,
-		req.StartDate, req.EndDate, req.Reason, req.ExpectedTime,
-		"**REJECTED**", extra)
+		req.Dates, req.Reason, req.ExpectedTime, "**REJECTED**", "")
 
-	// Update info post in main channel
+	// Update info post in main channel (status only)
 	s.mm.UpdatePost(req.PostID, &mattermost.Post{
 		ChannelID: req.ChannelID,
 		Message:   updatedMsg,
@@ -363,43 +354,48 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 		Props:     mattermost.Props{Attachments: []mattermost.Attachment{}},
 	})
 
-	dmMsg := fmt.Sprintf("Your leave request (%s, %s → %s) was **REJECTED** by @%s",
-		leaveTypeLabel(req.Type), req.StartDate, req.EndDate, rejecterUsername)
+	// Reply in thread to notify requester
+	replyMsg := fmt.Sprintf("@%s your leave request has been **REJECTED** by @%s", req.Username, rejecterUsername)
 	if reason != "" {
-		dmMsg += fmt.Sprintf("\n> **Reason:** %s", reason)
+		replyMsg += fmt.Sprintf("\n> **Reason:** %s", reason)
 	}
-	s.mm.SendDM(req.UserID, dmMsg)
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.ChannelID,
+		RootID:    req.PostID,
+		Message:   replyMsg,
+	})
 
 	return updatedMsg, nil
 }
 
-func validateDates(start, end string) error {
-	s, err := time.Parse("2006-01-02", start)
-	if err != nil {
-		return err
+func validateDateList(dates []string) error {
+	if len(dates) == 0 {
+		return fmt.Errorf("at least one date is required")
 	}
-	e, err := time.Parse("2006-01-02", end)
-	if err != nil {
-		return err
-	}
-	if e.Before(s) {
-		return fmt.Errorf("end date must not be before start date")
+	today := time.Now().Format(time.DateOnly)
+	for _, d := range dates {
+		if _, err := time.Parse(time.DateOnly, d); err != nil {
+			return fmt.Errorf("invalid date %q: %w", d, err)
+		}
+		if d < today {
+			return fmt.Errorf("date %s is in the past", d)
+		}
 	}
 	return nil
 }
 
-func formatLeaveMsg(username, leaveTypeName string, leaveTypeRaw model.LeaveType, startDate, endDate, reason, timeStr, status, extra string) string {
+func formatLeaveMsg(username, leaveTypeName string, leaveTypeRaw model.LeaveType, dates []string, reason, timeStr, status, extra string) string {
 	var msg string
 	switch leaveTypeRaw {
 	case model.LeaveTypeLateArrival:
 		msg = fmt.Sprintf("#### Late Arrival Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Date** | %s |\n| **Expected Arrival** | %s |\n| **Reason** | %s |\n| **Status** | %s |",
-			username, startDate, timeStr, reason, status)
+			username, dates[0], timeStr, reason, status)
 	case model.LeaveTypeEarlyDeparture:
 		msg = fmt.Sprintf("#### Early Departure Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Date** | %s |\n| **Expected Departure** | %s |\n| **Reason** | %s |\n| **Status** | %s |",
-			username, startDate, timeStr, reason, status)
+			username, dates[0], timeStr, reason, status)
 	default:
-		msg = fmt.Sprintf("#### Leave Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Type** | %s |\n| **Date** | %s → %s |\n| **Reason** | %s |\n| **Status** | %s |",
-			username, leaveTypeName, startDate, endDate, reason, status)
+		msg = fmt.Sprintf("#### Leave Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Type** | %s |\n| **Dates** | %s |\n| **Reason** | %s |\n| **Status** | %s |",
+			username, leaveTypeName, strings.Join(dates, ", "), reason, status)
 	}
 	if extra != "" {
 		msg += "\n" + extra

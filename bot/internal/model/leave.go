@@ -33,8 +33,7 @@ type LeaveRequest struct {
 	PostID            string        `bson:"post_id" json:"post_id"`
 	ApprovalPostID    string        `bson:"approval_post_id" json:"approval_post_id"`
 	Type              LeaveType     `bson:"type" json:"type"`
-	StartDate         string        `bson:"start_date" json:"start_date"`
-	EndDate           string        `bson:"end_date" json:"end_date"`
+	Dates             []string      `bson:"dates" json:"dates"` // list of YYYY-MM-DD
 	Reason            string        `bson:"reason" json:"reason"`
 	ExpectedTime      string        `bson:"expected_time,omitempty" json:"expected_time,omitempty"` // HH:MM for late arrival / early departure
 	Status            LeaveStatus   `bson:"status" json:"status"`

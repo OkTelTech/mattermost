@@ -12,6 +12,7 @@ type Client struct {
 	baseURL    string
 	botToken   string
 	httpClient *http.Client
+	botUserID  string // resolved lazily via /api/v4/users/me
 }
 
 func NewClient(baseURL, botToken string) *Client {
@@ -117,18 +118,36 @@ func (c *Client) UpdatePost(postID string, post *Post) (*Post, error) {
 	return &result, nil
 }
 
+// getBotUserID resolves and caches the bot's own user ID.
+func (c *Client) getBotUserID() (string, error) {
+	if c.botUserID != "" {
+		return c.botUserID, nil
+	}
+	user, err := c.GetUser("me")
+	if err != nil {
+		return "", fmt.Errorf("get bot user: %w", err)
+	}
+	c.botUserID = user.ID
+	return c.botUserID, nil
+}
+
 // SendDM sends a direct message to a user.
 func (c *Client) SendDM(userID, message string) error {
-	// First, get or create a DM channel between bot and user
+	botID, err := c.getBotUserID()
+	if err != nil {
+		return err
+	}
+
+	// Get or create a DM channel between bot and user
 	var channel struct {
 		ID string `json:"id"`
 	}
-	payload := []string{userID, "me"}
+	payload := []string{userID, botID}
 	if err := c.doJSON("POST", "/api/v4/channels/direct", payload, &channel); err != nil {
 		return fmt.Errorf("create dm channel: %w", err)
 	}
 
-	_, err := c.CreatePost(&Post{
+	_, err = c.CreatePost(&Post{
 		ChannelID: channel.ID,
 		Message:   message,
 	})

@@ -5160,5 +5160,6 @@
   "user_settings.notifications.test_notification.go_to_docs": "Tài liệu khắc phục sự cố",
   "user_settings.notifications.test_notification.send_button.send": "Gửi thông báo thử nghiệm",
   "user_settings.notifications.test_notification.title": "Khắc phục sự cố thông báo",
-  "userSettingsModal.pluginPreferences.header": "TÙY CHỌN PLUGIN"
+  "userSettingsModal.pluginPreferences.header": "TÙY CHỌN PLUGIN",
+  "plugin.upload": "Tin nhắn thoại"
 }

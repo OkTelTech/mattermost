@@ -19,9 +19,7 @@ func NewBudgetStore(ctx context.Context, db *MongoDB) (*BudgetStore, error) {
 	budget := db.Collection("budget_requests")
 
 	if _, err := budget.Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{
-			Keys: bson.D{{Key: "user_id", Value: 1}},
-		},
+		{Keys: bson.D{{Key: "created_at", Value: 1}}},
 	}); err != nil {
 		return nil, fmt.Errorf("create budget indexes: %w", err)
 	}

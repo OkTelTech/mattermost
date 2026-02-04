@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
@@ -257,18 +258,11 @@ func (h *AttendanceHandler) HandleLeaveForm(w http.ResponseWriter, r *http.Reque
 					},
 				},
 				{
-					DisplayName: "Start Date",
-					Name:        "start_date",
-					Type:        "text",
-					SubType:     "date",
-					Placeholder: "YYYY-MM-DD",
-				},
-				{
-					DisplayName: "End Date",
-					Name:        "end_date",
-					Type:        "text",
-					SubType:     "date",
-					Placeholder: "YYYY-MM-DD",
+					DisplayName: "Dates",
+					Name:        "dates",
+					Type:        "textarea",
+					HelpText:    "Enter dates separated by commas",
+					Placeholder: "YYYY-MM-DD, YYYY-MM-DD, ...",
 				},
 				{
 					DisplayName: "Reason",
@@ -299,14 +293,22 @@ func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Parse comma-separated dates
+	var dates []string
+	for _, d := range strings.Split(sub.Submission["dates"], ",") {
+		d = strings.TrimSpace(d)
+		if d != "" {
+			dates = append(dates, d)
+		}
+	}
+
 	err := h.svc.CreateLeaveRequest(
 		r.Context(),
 		sub.UserID,
 		sub.UserName,
 		sub.ChannelID,
 		model.LeaveType(sub.Submission["leave_type"]),
-		sub.Submission["start_date"],
-		sub.Submission["end_date"],
+		dates,
 		sub.Submission["reason"],
 		"",
 	)
@@ -382,8 +384,7 @@ func (h *AttendanceHandler) HandleLateArrivalSubmit(w http.ResponseWriter, r *ht
 		sub.UserName,
 		sub.ChannelID,
 		model.LeaveTypeLateArrival,
-		sub.Submission["date"],
-		sub.Submission["date"],
+		[]string{sub.Submission["date"]},
 		sub.Submission["reason"],
 		sub.Submission["time"],
 	)
@@ -459,8 +460,7 @@ func (h *AttendanceHandler) HandleEarlyDepartureSubmit(w http.ResponseWriter, r 
 		sub.UserName,
 		sub.ChannelID,
 		model.LeaveTypeEarlyDeparture,
-		sub.Submission["date"],
-		sub.Submission["date"],
+		[]string{sub.Submission["date"]},
 		sub.Submission["reason"],
 		sub.Submission["time"],
 	)

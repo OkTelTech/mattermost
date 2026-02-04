@@ -317,6 +317,10 @@ func GenerateLimitedClientConfig(c *model.Config, telemetryID string, license *m
 	props["EnableCustomEmoji"] = strconv.FormatBool(*c.ServiceSettings.EnableCustomEmoji)
 	props["EnableUserStatuses"] = strconv.FormatBool(*c.ServiceSettings.EnableUserStatuses)
 	props["AppDownloadLink"] = *c.NativeAppSettings.AppDownloadLink
+	props["WindowsAppDownloadLink"] = *c.NativeAppSettings.WindowsAppDownloadLink
+	props["LinuxAppDownloadLink"] = *c.NativeAppSettings.LinuxAppDownloadLink
+	props["MacosIntelAppDownloadLink"] = *c.NativeAppSettings.MacosIntelAppDownloadLink
+	props["MacosMAppDownloadLink"] = *c.NativeAppSettings.MacosMAppDownloadLink
 	props["AndroidAppDownloadLink"] = *c.NativeAppSettings.AndroidAppDownloadLink
 	props["IosAppDownloadLink"] = *c.NativeAppSettings.IosAppDownloadLink
 	props["MobileExternalBrowser"] = strconv.FormatBool(*c.NativeAppSettings.MobileExternalBrowser)

@@ -1,0 +1,181 @@
+// Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+// See LICENSE.txt for license information.
+
+@use 'utils/mixins';
+
+.apps-page-body {
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    padding: 40px 20px 80px;
+
+    .apps-page-body-content {
+        max-width: 1200px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .apps-page-header {
+        text-align: center;
+        margin-bottom: 48px;
+
+        .apps-page-title {
+            margin: 0 0 16px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: 600;
+            line-height: 48px;
+
+            @media (max-width: 768px) {
+                font-size: 32px;
+                line-height: 40px;
+            }
+        }
+
+        .apps-page-subtitle {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 18px;
+            line-height: 24px;
+
+            @media (max-width: 768px) {
+                font-size: 16px;
+                line-height: 20px;
+            }
+        }
+    }
+
+    .apps-page-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 24px;
+
+        @media (max-width: 768px) {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+    }
+
+    .apps-page-card {
+        display: flex;
+        flex-direction: column;
+        background: transparent;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+        border-radius: 8px;
+        padding: 32px 24px;
+        transition: all 0.2s ease;
+
+        &:hover {
+            border-color: rgba(var(--button-bg-rgb), 0.48);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .apps-page-card-icon {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 16px;
+
+            i {
+                font-size: 40px;
+                color: #fff;
+            }
+        }
+
+        .apps-page-card-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .apps-page-card-title {
+            margin: 0;
+            color: #fff;
+            font-size: 20px;
+            font-weight: 600;
+            line-height: 28px;
+            text-align: center;
+        }
+
+        .apps-page-card-description {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            line-height: 20px;
+            text-align: center;
+        }
+
+        .apps-page-card-platforms {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .apps-page-card-platform-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 16px;
+        }
+
+        .apps-page-card-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .apps-page-card-button {
+            display: block;
+            width: 100%;
+            padding: 12px 24px;
+            background: #fff;
+            color: #000;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 20px;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background: #f2f2f2;
+                text-decoration: none;
+                color: #000;
+            }
+
+            &:active {
+                background: #e6e6e6;
+            }
+
+            &.apps-page-card-button--secondary {
+                background: transparent;
+                border-color: rgba(255, 255, 255, 0.3);
+                color: #fff;
+
+                &:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-color: #fff;
+                    color: #fff;
+                }
+
+                &:active {
+                    background: rgba(255, 255, 255, 0.2);
+                }
+            }
+        }
+    }
+}
+
+// mac-instruction-modal styles removed to allow GenericModal theme to take over

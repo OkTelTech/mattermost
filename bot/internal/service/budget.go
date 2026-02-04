@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -22,26 +23,68 @@ func NewBudgetService(store *store.BudgetStore, mm *mattermost.Client, botURL st
 	return &BudgetService{store: store, mm: mm, botURL: botURL}
 }
 
-// CreateRequest handles step 1: Sale creates a budget request.
-func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, campaign, partner, purpose, deadline string, amount float64) error {
+// channelIDs holds the resolved IDs for all budget channels.
+type channelIDs struct {
+	Sale     string
+	Partner  string
+	TLQC     string
+	Approval string
+	Finance  string
+}
+
+func (s *BudgetService) resolveChannels(teamID, partner, suffix, saleChannelID string) (*channelIDs, error) {
+	partnerCh := model.PartnerChannelName(partner) + suffix
+	partnerID, err := s.mm.GetChannelByName(teamID, partnerCh)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", partnerCh, err)
+	}
+	tlqcCh := model.BudgetTLQCChannel + suffix
+	tlqcID, err := s.mm.GetChannelByName(teamID, tlqcCh)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", tlqcCh, err)
+	}
+	approvalCh := model.BudgetApprovalChannel + suffix
+	approvalID, err := s.mm.GetChannelByName(teamID, approvalCh)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", approvalCh, err)
+	}
+	financeCh := model.BudgetFinanceChannel + suffix
+	financeID, err := s.mm.GetChannelByName(teamID, financeCh)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", financeCh, err)
+	}
+	return &channelIDs{
+		Sale:     saleChannelID,
+		Partner:  partnerID,
+		TLQC:     tlqcID,
+		Approval: approvalID,
+		Finance:  financeID,
+	}, nil
+}
+
+// CreateRequest handles step 1: Sale creates a budget request from budget-sale channel.
+func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, name, partner, amount, purpose, deadline string) error {
+	// Extract suffix and teamID from sale channel (e.g. "budget-sale-dev" → suffix "-dev")
 	channelInfo, err := s.mm.GetChannel(channelID)
 	if err != nil {
 		return fmt.Errorf("get channel info: %w", err)
 	}
-	approvalChannelName := channelInfo.Name + approvalSuffix
-	approvalChannelID, err := s.mm.GetChannelByName(channelInfo.TeamID, approvalChannelName)
+	suffix := strings.TrimPrefix(channelInfo.Name, model.BudgetSaleChannel)
+
+	channels, err := s.resolveChannels(channelInfo.TeamID, partner, suffix, channelID)
 	if err != nil {
-		return fmt.Errorf("get approval channel '%s': %w", approvalChannelName, err)
+		return fmt.Errorf("resolve channels: %w", err)
 	}
 
-	// Create DB record first to get the ID
 	req := &model.BudgetRequest{
-		ChannelID:         channelID,
-		ApprovalChannelID: approvalChannelID,
-		CurrentStep:       1,
-		Status:            "step1",
+		CurrentStep:       model.BudgetStepSaleCreated,
+		SaleChannelID:     channels.Sale,
+		PartnerChannelID:  channels.Partner,
+		TLQCChannelID:     channels.TLQC,
+		ApprovalChannelID: channels.Approval,
+		FinanceChannelID:  channels.Finance,
 		SaleUserID:        userID,
-		Campaign:          campaign,
+		Name:              name,
 		Partner:           partner,
 		Amount:            amount,
 		Purpose:           purpose,
@@ -52,169 +95,310 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, ca
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetMsg(campaign, partner, amount, purpose, deadline, 1)
+	infoMsg := formatBudgetStatus(req, "Step 1/6 - Sale Created")
 
-	infoPost, err := s.mm.CreatePost(&mattermost.Post{
-		ChannelID: channelID,
-		Message:   infoMsg,
+	// Post info to budget-sale (no buttons)
+	salePost, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: channels.Sale,
+		Message:   "@all\n" + infoMsg,
 	})
 	if err != nil {
-		return fmt.Errorf("post info message: %w", err)
+		return fmt.Errorf("post to sale channel: %w", err)
 	}
 
-	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
-		ChannelID: approvalChannelID,
-		Message:   infoMsg,
+	// Post to budget-partner-{partner} with content button
+	partnerPost, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: channels.Partner,
+		Message:   "@all\n" + infoMsg,
 		Props: mattermost.Props{
 			Attachments: []mattermost.Attachment{{
-				Actions: []mattermost.Action{{
-					Name: "Fill Step 2 (Partner Content)",
-					Type: "button",
-					Integration: mattermost.Integration{
-						URL:     s.botURL + "/api/budget/step2-form",
-						Context: map[string]any{"request_id": idHex},
+				Actions: []mattermost.Action{
+					{
+						Name: "Fill Post Content",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/budget/partner-content-form",
+							Context: map[string]any{"request_id": idHex},
+						},
 					},
-				}},
+				},
 			}},
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("post approval message: %w", err)
+		return fmt.Errorf("post to partner channel: %w", err)
 	}
 
-	// Update record with post IDs
-	req.PostID = infoPost.ID
-	req.ApprovalPostID = approvalPost.ID
+	req.SalePostID = salePost.ID
+	req.PartnerPostID = partnerPost.ID
 	return s.store.Update(ctx, req)
 }
 
-// SubmitStep2 handles Partner submitting content info.
-func (s *BudgetService) SubmitStep2(ctx context.Context, requestID, postContent, postLink, pageLink string) error {
-	req, err := s.getAndValidate(ctx, requestID, 1)
-	if err != nil {
-		return err
-	}
-
-	req.PostContent = postContent
-	req.PostLink = postLink
-	req.PageLink = pageLink
-	req.CurrentStep = 2
-	req.Status = "step2"
-
-	if err := s.store.Update(ctx, req); err != nil {
-		return err
-	}
-
-	return s.updatePostWithNextStep(req, 2, "Confirm Step 3 (TLQC)", "/api/budget/step3")
-}
-
-// ConfirmStep3 handles TLQC confirmation.
-func (s *BudgetService) ConfirmStep3(ctx context.Context, requestID, adAccountID, userID string) error {
-	req, err := s.getAndValidate(ctx, requestID, 2)
-	if err != nil {
-		return err
-	}
-
-	req.AdAccountID = adAccountID
-	req.TLQCUserID = userID
-	req.TLQCConfirmed = true
-	req.CurrentStep = 3
-	req.Status = "step3"
-
-	if err := s.store.Update(ctx, req); err != nil {
-		return err
-	}
-
-	return s.updatePostWithNextStep(req, 3, "Fill Step 4 (Payment Info)", "/api/budget/step4-form")
-}
-
-// SubmitStep4 handles Partner submitting payment info.
-func (s *BudgetService) SubmitStep4(ctx context.Context, requestID, recipientName, bankAccount, bankName string, paymentAmount float64) error {
-	req, err := s.getAndValidate(ctx, requestID, 3)
-	if err != nil {
-		return err
-	}
-
-	req.RecipientName = recipientName
-	req.BankAccount = bankAccount
-	req.BankName = bankName
-	req.PaymentAmount = paymentAmount
-	req.CurrentStep = 4
-	req.Status = "step4"
-
-	if err := s.store.Update(ctx, req); err != nil {
-		return err
-	}
-
-	return s.updatePostWithNextStep(req, 4, "Approve Step 5 (Team Lead)", "/api/budget/step5")
-}
-
-// ApproveStep5 handles Team Lead approval.
-func (s *BudgetService) ApproveStep5(ctx context.Context, requestID, userID string) error {
-	req, err := s.getAndValidate(ctx, requestID, 4)
-	if err != nil {
-		return err
-	}
-
-	req.TeamLeadID = userID
-	req.Approved = true
-	req.CurrentStep = 5
-	req.Status = "step5"
-
-	if err := s.store.Update(ctx, req); err != nil {
-		return err
-	}
-
-	return s.updatePostWithNextStep(req, 5, "Fill Step 6 (Bank Note)", "/api/budget/step6-form")
-}
-
-// SubmitStep6 handles TL Bank adding note.
-func (s *BudgetService) SubmitStep6(ctx context.Context, requestID, bankNote string) error {
-	req, err := s.getAndValidate(ctx, requestID, 5)
-	if err != nil {
-		return err
-	}
-
-	req.BankNote = bankNote
-	req.CurrentStep = 6
-	req.Status = "step6"
-
-	if err := s.store.Update(ctx, req); err != nil {
-		return err
-	}
-
-	return s.updatePostWithNextStep(req, 6, "Complete Step 7 (Finance)", "/api/budget/step7-form")
-}
-
-// CompleteStep7 handles Finance completing the request.
-func (s *BudgetService) CompleteStep7(ctx context.Context, requestID, transactionCode string) error {
-	req, err := s.getAndValidate(ctx, requestID, 6)
+// SubmitContent handles step 2: Partner submits content info from budget-partner-{partner}.
+func (s *BudgetService) SubmitContent(ctx context.Context, requestID, postContent, postLink, pageLink string) error {
+	req, err := s.getAndValidate(ctx, requestID, model.BudgetStepSaleCreated)
 	if err != nil {
 		return err
 	}
 
 	now := time.Now()
-	req.TransactionCode = transactionCode
-	req.CompletedAt = &now
-	req.CurrentStep = 7
-	req.Status = "completed"
+	req.PostContent = postContent
+	req.PostLink = postLink
+	req.PageLink = pageLink
+	req.ContentAt = &now
+	req.CurrentStep = model.BudgetStepPartnerContent
 
 	if err := s.store.Update(ctx, req); err != nil {
 		return err
 	}
 
-	completedMsg := fmt.Sprintf("**BUDGET REQUEST - COMPLETED**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Transaction | %s |\n| Status | **COMPLETED** |",
-		req.Campaign, req.Partner, req.Amount, transactionCode)
+	idHex := req.ID.Hex()
+	infoMsg := formatBudgetStatus(req, "Step 2/6 - Partner Content Added")
+	contentDetail := fmt.Sprintf("\n| **Post Content** | %s |\n| **Post Link** | %s |\n| **Page Link** | %s |",
+		postContent, postLink, pageLink)
 
+	// Update partner post (remove button, show content)
+	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
+		ChannelID: req.PartnerChannelID,
+		Message:   infoMsg + contentDetail,
+	})
+
+	// Create post in budget-tlqc with confirm button
+	tlqcPost, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.TLQCChannelID,
+		Message:   "@all\n" + infoMsg + contentDetail,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{{
+				Actions: []mattermost.Action{
+					{
+						Name: "Confirm",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/budget/tlqc-confirm",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+				},
+			}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("post to tlqc channel: %w", err)
+	}
+
+	// Update sale post status
+	s.mm.UpdatePost(req.SalePostID, &mattermost.Post{
+		ChannelID: req.SaleChannelID,
+		Message:   infoMsg,
+	})
+
+	req.TLQCPostID = tlqcPost.ID
+	return s.store.Update(ctx, req)
+}
+
+// ConfirmTLQC handles step 3: TLQC confirms from budget-tlqc (button only, no dialog).
+func (s *BudgetService) ConfirmTLQC(ctx context.Context, requestID, userID string) error {
+	req, err := s.getAndValidate(ctx, requestID, model.BudgetStepPartnerContent)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	req.TLQCUserID = userID
+	req.TLQCConfirmedAt = &now
+	req.CurrentStep = model.BudgetStepTLQCConfirmed
+
+	if err := s.store.Update(ctx, req); err != nil {
+		return err
+	}
+
+	idHex := req.ID.Hex()
+	infoMsg := formatBudgetStatus(req, "Step 3/6 - TLQC Confirmed")
+
+	// Update TLQC post (remove button)
+	s.mm.UpdatePost(req.TLQCPostID, &mattermost.Post{
+		ChannelID: req.TLQCChannelID,
+		Message:   infoMsg,
+	})
+
+	// Update partner post with payment button
+	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
+		ChannelID: req.PartnerChannelID,
+		Message:   infoMsg,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{{
+				Actions: []mattermost.Action{
+					{
+						Name: "Fill Payment Info",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/budget/partner-payment-form",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+				},
+			}},
+		},
+	})
+
+	// Update sale post status
+	s.mm.UpdatePost(req.SalePostID, &mattermost.Post{
+		ChannelID: req.SaleChannelID,
+		Message:   infoMsg,
+	})
+
+	return nil
+}
+
+// SubmitPayment handles step 4: Partner submits payment info from budget-partner-{partner}.
+func (s *BudgetService) SubmitPayment(ctx context.Context, requestID, recipientName, bankAccount, bankName, paymentAmount string) error {
+	req, err := s.getAndValidate(ctx, requestID, model.BudgetStepTLQCConfirmed)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	req.RecipientName = recipientName
+	req.BankAccount = bankAccount
+	req.BankName = bankName
+	req.PaymentAmount = paymentAmount
+	req.PaymentAt = &now
+	req.CurrentStep = model.BudgetStepPaymentInfo
+
+	if err := s.store.Update(ctx, req); err != nil {
+		return err
+	}
+
+	idHex := req.ID.Hex()
+	infoMsg := formatBudgetStatus(req, "Step 4/6 - Payment Info Added")
+	paymentDetail := fmt.Sprintf("\n| **Recipient** | %s |\n| **Bank Account** | %s |\n| **Bank** | %s |\n| **Payment Amount** | %s |",
+		recipientName, bankAccount, bankName, paymentAmount)
+
+	// Update partner post (remove button, show payment info)
+	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
+		ChannelID: req.PartnerChannelID,
+		Message:   infoMsg + paymentDetail,
+	})
+
+	// Create post in budget-approval with approve + reject buttons
+	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.ApprovalChannelID,
+		Message:   "@all\n" + infoMsg + paymentDetail,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{{
+				Actions: []mattermost.Action{
+					{
+						Name: "Approve",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/budget/approval-approve",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+					{
+						Name: "Reject",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/budget/reject",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+				},
+			}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("post to approval channel: %w", err)
+	}
+
+	// Update sale post status
+	s.mm.UpdatePost(req.SalePostID, &mattermost.Post{
+		ChannelID: req.SaleChannelID,
+		Message:   infoMsg,
+	})
+
+	req.ApprovalPostID = approvalPost.ID
+	return s.store.Update(ctx, req)
+}
+
+// Approve handles step 5: Approver approves from budget-approval (button only).
+func (s *BudgetService) Approve(ctx context.Context, requestID, userID string) error {
+	req, err := s.getAndValidate(ctx, requestID, model.BudgetStepPaymentInfo)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	req.ApproverID = userID
+	req.ApprovedAt = &now
+	req.CurrentStep = model.BudgetStepApproved
+
+	if err := s.store.Update(ctx, req); err != nil {
+		return err
+	}
+
+	idHex := req.ID.Hex()
+	infoMsg := formatBudgetStatus(req, "Step 5/6 - Approved")
+
+	// Update approval post (remove buttons)
 	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
-		Message:   completedMsg,
-	})
-	s.mm.UpdatePost(req.PostID, &mattermost.Post{
-		ChannelID: req.ChannelID,
-		Message:   completedMsg,
+		Message:   infoMsg,
 	})
 
+	// Create post in budget-finance with complete button
+	financePost, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.FinanceChannelID,
+		Message:   "@all\n" + infoMsg,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{{
+				Actions: []mattermost.Action{
+					{
+						Name: "Complete",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/budget/finance-complete-form",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+				},
+			}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("post to finance channel: %w", err)
+	}
+
+	// Update sale post status
+	s.mm.UpdatePost(req.SalePostID, &mattermost.Post{
+		ChannelID: req.SaleChannelID,
+		Message:   infoMsg,
+	})
+
+	req.FinancePostID = financePost.ID
+	return s.store.Update(ctx, req)
+}
+
+// Complete handles step 6: Finance completes from budget-finance.
+func (s *BudgetService) Complete(ctx context.Context, requestID, transactionCode, billURL, userID string) error {
+	req, err := s.getAndValidate(ctx, requestID, model.BudgetStepApproved)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	req.FinanceUserID = userID
+	req.TransactionCode = transactionCode
+	req.BillURL = billURL
+	req.CompletedAt = &now
+	req.CurrentStep = model.BudgetStepCompleted
+
+	if err := s.store.Update(ctx, req); err != nil {
+		return err
+	}
+
+	completedMsg := formatCompletedMsg(req)
+	s.updateAllPosts(req, completedMsg)
 	return nil
 }
 
@@ -232,31 +416,44 @@ func (s *BudgetService) RejectRequest(ctx context.Context, requestID, userID str
 	if req == nil {
 		return fmt.Errorf("budget request not found")
 	}
-	if req.Status == "completed" || req.Status == "rejected" {
-		return fmt.Errorf("request is already %s", req.Status)
+	if req.CurrentStep >= model.BudgetStepCompleted {
+		return fmt.Errorf("request is already completed")
+	}
+	if req.RejectedAt != nil {
+		return fmt.Errorf("request is already rejected")
 	}
 
-	req.Status = "rejected"
+	now := time.Now()
+	req.RejectedAt = &now
 	if err := s.store.Update(ctx, req); err != nil {
 		return err
 	}
 
-	rejectedMsg := fmt.Sprintf("**BUDGET REQUEST - REJECTED**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Status | **REJECTED** at step %d |",
-		req.Campaign, req.Partner, req.Amount, req.CurrentStep)
-
-	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
-		ChannelID: req.ApprovalChannelID,
-		Message:   rejectedMsg,
-	})
-	s.mm.UpdatePost(req.PostID, &mattermost.Post{
-		ChannelID: req.ChannelID,
-		Message:   rejectedMsg,
-	})
-
+	rejectedMsg := formatRejectedMsg(req)
+	s.updateAllPosts(req, rejectedMsg)
 	return nil
 }
 
-func (s *BudgetService) getAndValidate(ctx context.Context, requestID string, expectedStep int) (*model.BudgetRequest, error) {
+// updateAllPosts updates all existing posts across all channels with the given message.
+func (s *BudgetService) updateAllPosts(req *model.BudgetRequest, msg string) {
+	posts := []struct{ postID, channelID string }{
+		{req.SalePostID, req.SaleChannelID},
+		{req.PartnerPostID, req.PartnerChannelID},
+		{req.TLQCPostID, req.TLQCChannelID},
+		{req.ApprovalPostID, req.ApprovalChannelID},
+		{req.FinancePostID, req.FinanceChannelID},
+	}
+	for _, p := range posts {
+		if p.postID != "" {
+			s.mm.UpdatePost(p.postID, &mattermost.Post{
+				ChannelID: p.channelID,
+				Message:   msg,
+			})
+		}
+	}
+}
+
+func (s *BudgetService) getAndValidate(ctx context.Context, requestID string, expectedStep model.BudgetStep) (*model.BudgetRequest, error) {
 	id, err := bson.ObjectIDFromHex(requestID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid request ID: %w", err)
@@ -269,63 +466,34 @@ func (s *BudgetService) getAndValidate(ctx context.Context, requestID string, ex
 	if req == nil {
 		return nil, fmt.Errorf("budget request not found")
 	}
+	if req.RejectedAt != nil {
+		return nil, fmt.Errorf("request has been rejected")
+	}
 	if req.CurrentStep != expectedStep {
 		return nil, fmt.Errorf("request is at step %d, expected step %d", req.CurrentStep, expectedStep)
 	}
 	return req, nil
 }
 
-func (s *BudgetService) updatePostWithNextStep(req *model.BudgetRequest, completedStep int, nextButtonLabel, nextURL string) error {
-	msg := formatBudgetMsg(req.Campaign, req.Partner, req.Amount, req.Purpose, req.Deadline, completedStep+1)
-	idHex := req.ID.Hex()
-
-	// Update info post (no buttons)
-	s.mm.UpdatePost(req.PostID, &mattermost.Post{
-		ChannelID: req.ChannelID,
-		Message:   msg,
-	})
-
-	// Update approval post with next step button
-	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
-		ChannelID: req.ApprovalChannelID,
-		Message:   msg,
-		Props: mattermost.Props{
-			Attachments: []mattermost.Attachment{{
-				Actions: []mattermost.Action{
-					{
-						Name: nextButtonLabel,
-						Type: "button",
-						Integration: mattermost.Integration{
-							URL:     s.botURL + nextURL,
-							Context: map[string]any{"request_id": idHex},
-						},
-					},
-					{
-						Name: "Reject",
-						Type: "button",
-						Integration: mattermost.Integration{
-							URL:     s.botURL + "/api/budget/reject",
-							Context: map[string]any{"request_id": idHex},
-						},
-					},
-				},
-			}},
-		},
-	})
-
-	return nil
+func formatBudgetInfo(req *model.BudgetRequest) string {
+	return fmt.Sprintf("#### Budget Request\n| | |\n|:--|:--|\n| **Name** | %s |\n| **Partner** | %s |\n| **Amount** | %s |\n| **Purpose** | %s |\n| **Deadline** | %s |",
+		req.Name, req.Partner, req.Amount, req.Purpose, req.Deadline)
 }
 
-func formatBudgetMsg(campaign, partner string, amount float64, purpose, deadline string, step int) string {
-	stepNames := []string{
-		"", "Sale Created", "Partner Content", "TLQC Confirmed",
-		"Payment Info", "Team Lead Approved", "Bank Note Added", "Completed",
-	}
-	stepLabel := "PENDING"
-	if step > 0 && step <= len(stepNames)-1 {
-		stepLabel = fmt.Sprintf("Step %d/7 - %s", step, stepNames[step])
-	}
+func formatBudgetStatus(req *model.BudgetRequest, statusLabel string) string {
+	return formatBudgetInfo(req) + fmt.Sprintf("\n| **Status** | %s |", statusLabel)
+}
 
-	return fmt.Sprintf("**BUDGET REQUEST**\n| | |\n|:--|:--|\n| Campaign | %s |\n| Partner | %s |\n| Amount | %.0f |\n| Purpose | %s |\n| Deadline | %s |\n| Status | %s |",
-		campaign, partner, amount, purpose, deadline, stepLabel)
+func formatCompletedMsg(req *model.BudgetRequest) string {
+	msg := formatBudgetInfo(req)
+	msg += fmt.Sprintf("\n| **Transaction Code** | %s |", req.TransactionCode)
+	if req.BillURL != "" {
+		msg += fmt.Sprintf("\n| **Bill** | %s |", req.BillURL)
+	}
+	msg += "\n| **Status** | **COMPLETED** |"
+	return msg
+}
+
+func formatRejectedMsg(req *model.BudgetRequest) string {
+	return formatBudgetInfo(req) + fmt.Sprintf("\n| **Status** | **REJECTED** at step %d |", req.CurrentStep)
 }

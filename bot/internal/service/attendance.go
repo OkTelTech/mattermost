@@ -13,7 +13,6 @@ import (
 	"oktel-bot/internal/store"
 )
 
-const approvalSuffix = "-approval"
 
 type AttendanceService struct {
 	store  *store.AttendanceStore
@@ -179,7 +178,9 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		return fmt.Errorf("get channel info: %w", err)
 	}
 
-	approvalChannelName := channelInfo.Name + approvalSuffix
+	// Extract suffix from channel name (e.g. "attendance-dev" → suffix "-dev")
+	suffix := strings.TrimPrefix(channelInfo.Name, model.AttendanceChannel)
+	approvalChannelName := model.AttendanceApprovalChannel + suffix
 	approvalChannelID, err := s.mm.GetChannelByName(channelInfo.TeamID, approvalChannelName)
 	if err != nil {
 		return fmt.Errorf("get approval channel '%s': %w", approvalChannelName, err)

@@ -14,6 +14,11 @@ const (
 	AttendanceStatusCompleted AttendanceStatus = "completed"
 )
 
+const (
+	AttendanceChannel         = "attendance"
+	AttendanceApprovalChannel = "attendance-approval"
+)
+
 // BreakRecord represents a single break period with a reason.
 type BreakRecord struct {
 	Start  time.Time  `bson:"start" json:"start"`

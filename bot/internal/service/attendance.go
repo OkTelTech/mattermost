@@ -118,8 +118,7 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 		return "", err
 	}
 
-	duration := now.Sub(last.Start).Round(time.Minute)
-	msg := fmt.Sprintf("@%s ended break at %s (break: %s)", username, now.Format(time.TimeOnly), duration)
+	msg := fmt.Sprintf("@%s ended break at %s", username, now.Format(time.TimeOnly))
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }
@@ -155,9 +154,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		totalBreak += end.Sub(b.Start)
 	}
 
-	workDuration := now.Sub(*record.CheckIn).Round(time.Minute)
-	msg := fmt.Sprintf("@%s checked out at %s (total: %s, breaks: %s)",
-		username, now.Format(time.TimeOnly), workDuration, totalBreak.Round(time.Minute))
+	msg := fmt.Sprintf("@%s checked out at %s", username, now.Format(time.TimeOnly))
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }

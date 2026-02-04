@@ -86,39 +86,46 @@ func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Re
 
 	writeJSON(w, SlashResponse{
 		ResponseType: "ephemeral",
-		Attachments: []mattermost.Attachment{{
-			Text: "**Attendance** - Select action:",
-			Actions: []mattermost.Action{
-				{Name: "Check In", Type: "button", Integration: mattermost.Integration{
-					URL:     h.botURL + "/api/attendance/checkin",
-					Context: map[string]any{"action": "checkin"},
-				}},
-				{Name: "Break", Type: "button", Integration: mattermost.Integration{
-					URL:     h.botURL + "/api/attendance/break-start",
-					Context: map[string]any{"action": "break-start"},
-				}},
-				{Name: "End Break", Type: "button", Integration: mattermost.Integration{
-					URL:     h.botURL + "/api/attendance/break-end",
-					Context: map[string]any{"action": "break-end"},
-				}},
-				{Name: "Check Out", Type: "button", Integration: mattermost.Integration{
-					URL:     h.botURL + "/api/attendance/checkout",
-					Context: map[string]any{"action": "checkout"},
-				}},
-				{Name: "Leave Request", Type: "button", Integration: mattermost.Integration{
-					URL:     h.botURL + "/api/attendance/leave-form",
-					Context: map[string]any{"action": "leave-form"},
-				}},
-				{Name: "Late Arrival", Type: "button", Integration: mattermost.Integration{
-					URL:     h.botURL + "/api/attendance/late-form",
-					Context: map[string]any{"action": "late-form"},
-				}},
-				{Name: "Early Departure", Type: "button", Integration: mattermost.Integration{
-					URL:     h.botURL + "/api/attendance/early-form",
-					Context: map[string]any{"action": "early-form"},
-				}},
+		Attachments: []mattermost.Attachment{
+			{
+				Text: "**Attendance**",
+				Actions: []mattermost.Action{
+					{Name: "Check In", Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/checkin",
+						Context: map[string]any{"action": "checkin"},
+					}},
+					{Name: "Break", Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-start",
+						Context: map[string]any{"action": "break-start"},
+					}},
+					{Name: "End Break", Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-end",
+						Context: map[string]any{"action": "break-end"},
+					}},
+					{Name: "Check Out", Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/checkout",
+						Context: map[string]any{"action": "checkout"},
+					}},
+				},
 			},
-		}},
+			{
+				Text: "**Requests**",
+				Actions: []mattermost.Action{
+					{Name: "Leave Request", Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/leave-form",
+						Context: map[string]any{"action": "leave-form"},
+					}},
+					{Name: "Late Arrival", Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/late-form",
+						Context: map[string]any{"action": "late-form"},
+					}},
+					{Name: "Early Departure", Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/early-form",
+						Context: map[string]any{"action": "early-form"},
+					}},
+				},
+			},
+		},
 	})
 }
 

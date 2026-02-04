@@ -42,7 +42,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		ChannelID: channelID,
 		Date:      date,
 		CheckIn:   &now,
-		Status:    model.StatusWorking,
+		Status:    model.AttendanceStatusWorking,
 	}
 	if err := s.store.CreateRecord(ctx, record); err != nil {
 		return "", fmt.Errorf("create record: %w", err)
@@ -73,10 +73,10 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 	if record == nil {
 		return "", fmt.Errorf("@%s has not checked in today", username)
 	}
-	if record.Status == model.StatusBreak {
+	if record.Status == model.AttendanceStatusBreak {
 		return "", fmt.Errorf("@%s is already on break", username)
 	}
-	if record.Status != model.StatusWorking {
+	if record.Status != model.AttendanceStatusWorking {
 		return "", fmt.Errorf("@%s is not currently working (status: %s)", username, record.Status)
 	}
 
@@ -84,7 +84,7 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 		Start:  now,
 		Reason: reason,
 	})
-	record.Status = model.StatusBreak
+	record.Status = model.AttendanceStatusBreak
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", err
 	}
@@ -105,14 +105,14 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 	if record == nil {
 		return "", fmt.Errorf("@%s has not checked in today", username)
 	}
-	if record.Status != model.StatusBreak {
+	if record.Status != model.AttendanceStatusBreak {
 		return "", fmt.Errorf("@%s is not on break", username)
 	}
 
 	// Close the last open break
 	last := &record.Breaks[len(record.Breaks)-1]
 	last.End = &now
-	record.Status = model.StatusWorking
+	record.Status = model.AttendanceStatusWorking
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", err
 	}
@@ -139,7 +139,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	}
 
 	record.CheckOut = &now
-	record.Status = model.StatusCompleted
+	record.Status = model.AttendanceStatusCompleted
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", err
 	}

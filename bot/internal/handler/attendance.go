@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"oktel-bot/internal/mattermost"
+	"oktel-bot/internal/model"
 	"oktel-bot/internal/service"
 )
 
@@ -106,6 +107,14 @@ func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Re
 				{Name: "Leave Request", Type: "button", Integration: mattermost.Integration{
 					URL:     h.botURL + "/api/attendance/leave-form",
 					Context: map[string]any{"action": "leave-form"},
+				}},
+				{Name: "Late Arrival", Type: "button", Integration: mattermost.Integration{
+					URL:     h.botURL + "/api/attendance/late-form",
+					Context: map[string]any{"action": "late-form"},
+				}},
+				{Name: "Early Departure", Type: "button", Integration: mattermost.Integration{
+					URL:     h.botURL + "/api/attendance/early-form",
+					Context: map[string]any{"action": "early-form"},
 				}},
 			},
 		}},
@@ -242,9 +251,9 @@ func (h *AttendanceHandler) HandleLeaveForm(w http.ResponseWriter, r *http.Reque
 					Name:        "leave_type",
 					Type:        "select",
 					Options: []mattermost.SelectOption{
-						{Text: "Annual Leave", Value: "leave"},
-						{Text: "Emergency Leave", Value: "emergency"},
-						{Text: "Sick Leave", Value: "sick"},
+						{Text: "Annual Leave", Value: string(model.LeaveTypeAnnual)},
+						{Text: "Emergency Leave", Value: string(model.LeaveTypeEmergency)},
+						{Text: "Sick Leave", Value: string(model.LeaveTypeSick)},
 					},
 				},
 				{
@@ -295,14 +304,169 @@ func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Req
 		sub.UserID,
 		sub.UserName,
 		sub.ChannelID,
-		sub.Submission["leave_type"],
+		model.LeaveType(sub.Submission["leave_type"]),
 		sub.Submission["start_date"],
 		sub.Submission["end_date"],
 		sub.Submission["reason"],
+		"",
 	)
 	if err != nil {
 		log.Printf("ERROR create leave request: %v", err)
 		writeJSON(w, map[string]string{"error": "Failed to create leave request: " + err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// HandleLateArrivalForm opens the late arrival request dialog.
+func (h *AttendanceHandler) HandleLateArrivalForm(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/late",
+		Dialog: mattermost.Dialog{
+			Title:       "Late Arrival Request",
+			SubmitLabel: "Submit",
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: "Date",
+					Name:        "date",
+					Type:        "text",
+					SubType:     "date",
+					Placeholder: "YYYY-MM-DD",
+				},
+				{
+					DisplayName: "Expected Arrival Time",
+					Name:        "time",
+					Type:        "text",
+					Placeholder: "e.g. 10:00",
+				},
+				{
+					DisplayName: "Reason",
+					Name:        "reason",
+					Type:        "textarea",
+					Placeholder: "Enter your reason...",
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("ERROR open late arrival dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form. Please try again."})
+		return
+	}
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleLateArrivalSubmit processes the late arrival dialog submission.
+func (h *AttendanceHandler) HandleLateArrivalSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	err := h.svc.CreateLeaveRequest(
+		r.Context(),
+		sub.UserID,
+		sub.UserName,
+		sub.ChannelID,
+		model.LeaveTypeLateArrival,
+		sub.Submission["date"],
+		sub.Submission["date"],
+		sub.Submission["reason"],
+		sub.Submission["time"],
+	)
+	if err != nil {
+		log.Printf("ERROR create late arrival request: %v", err)
+		writeJSON(w, map[string]string{"error": "Failed to create request: " + err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// HandleEarlyDepartureForm opens the early departure request dialog.
+func (h *AttendanceHandler) HandleEarlyDepartureForm(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/early",
+		Dialog: mattermost.Dialog{
+			Title:       "Early Departure Request",
+			SubmitLabel: "Submit",
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: "Date",
+					Name:        "date",
+					Type:        "text",
+					SubType:     "date",
+					Placeholder: "YYYY-MM-DD",
+				},
+				{
+					DisplayName: "Expected Departure Time",
+					Name:        "time",
+					Type:        "text",
+					Placeholder: "e.g. 15:00",
+				},
+				{
+					DisplayName: "Reason",
+					Name:        "reason",
+					Type:        "textarea",
+					Placeholder: "Enter your reason...",
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("ERROR open early departure dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form. Please try again."})
+		return
+	}
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleEarlyDepartureSubmit processes the early departure dialog submission.
+func (h *AttendanceHandler) HandleEarlyDepartureSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	err := h.svc.CreateLeaveRequest(
+		r.Context(),
+		sub.UserID,
+		sub.UserName,
+		sub.ChannelID,
+		model.LeaveTypeEarlyDeparture,
+		sub.Submission["date"],
+		sub.Submission["date"],
+		sub.Submission["reason"],
+		sub.Submission["time"],
+	)
+	if err != nil {
+		log.Printf("ERROR create early departure request: %v", err)
+		writeJSON(w, map[string]string{"error": "Failed to create request: " + err.Error()})
 		return
 	}
 
@@ -337,7 +501,7 @@ func (h *AttendanceHandler) HandleApprove(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// HandleReject handles the reject button click.
+// HandleReject opens a dialog asking for the rejection reason.
 func (h *AttendanceHandler) HandleReject(w http.ResponseWriter, r *http.Request) {
 	var req ActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -351,18 +515,65 @@ func (h *AttendanceHandler) HandleReject(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	msg, err := h.svc.RejectLeave(r.Context(), requestID, req.UserID, req.UserName, "")
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/reject-submit",
+		Dialog: mattermost.Dialog{
+			CallbackID:  requestID,
+			Title:       "Reject Request",
+			SubmitLabel: "Reject",
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: "Reason",
+					Name:        "reason",
+					Type:        "textarea",
+					Placeholder: "Enter rejection reason...",
+				},
+			},
+		},
+	})
 	if err != nil {
-		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		log.Printf("ERROR open reject dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form. Please try again."})
+		return
+	}
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleRejectSubmit processes the reject dialog submission.
+func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	writeJSON(w, ActionResponse{
-		Update: &ActionUpdate{
-			Message: msg,
-			Props:   &mattermost.Props{Attachments: []mattermost.Attachment{}},
-		},
-	})
+	requestID := sub.CallbackID
+	if requestID == "" {
+		writeJSON(w, map[string]string{"error": "Missing request ID"})
+		return
+	}
+
+	username := sub.UserName
+	if username == "" {
+		user, err := h.mm.GetUser(sub.UserID)
+		if err == nil {
+			username = user.Username
+		}
+	}
+
+	_, err := h.svc.RejectLeave(r.Context(), requestID, sub.UserID, username, sub.Submission["reason"])
+	if err != nil {
+		log.Printf("ERROR reject leave: %v", err)
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // RegisterRoutes registers all attendance routes on the given mux.
@@ -375,8 +586,13 @@ func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance/checkout", h.HandleCheckOut)
 	mux.HandleFunc("POST /api/attendance/leave-form", h.HandleLeaveForm)
 	mux.HandleFunc("POST /api/attendance/leave", h.HandleLeaveSubmit)
+	mux.HandleFunc("POST /api/attendance/late-form", h.HandleLateArrivalForm)
+	mux.HandleFunc("POST /api/attendance/late", h.HandleLateArrivalSubmit)
+	mux.HandleFunc("POST /api/attendance/early-form", h.HandleEarlyDepartureForm)
+	mux.HandleFunc("POST /api/attendance/early", h.HandleEarlyDepartureSubmit)
 	mux.HandleFunc("POST /api/attendance/approve", h.HandleApprove)
 	mux.HandleFunc("POST /api/attendance/reject", h.HandleReject)
+	mux.HandleFunc("POST /api/attendance/reject-submit", h.HandleRejectSubmit)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

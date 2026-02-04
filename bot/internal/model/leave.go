@@ -6,14 +6,22 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-const (
-	LeaveTypeAnnual    = "leave"
-	LeaveTypeEmergency = "emergency"
-	LeaveTypeSick      = "sick"
+type LeaveType string
 
-	LeaveStatusPending  = "pending"
-	LeaveStatusApproved = "approved"
-	LeaveStatusRejected = "rejected"
+const (
+	LeaveTypeAnnual         LeaveType = "leave"
+	LeaveTypeEmergency      LeaveType = "emergency"
+	LeaveTypeSick           LeaveType = "sick"
+	LeaveTypeLateArrival    LeaveType = "late_arrival"
+	LeaveTypeEarlyDeparture LeaveType = "early_departure"
+)
+
+type LeaveStatus string
+
+const (
+	LeaveStatusPending  LeaveStatus = "pending"
+	LeaveStatusApproved LeaveStatus = "approved"
+	LeaveStatusRejected LeaveStatus = "rejected"
 )
 
 type LeaveRequest struct {
@@ -24,12 +32,12 @@ type LeaveRequest struct {
 	ApprovalChannelID string        `bson:"approval_channel_id" json:"approval_channel_id"`
 	PostID            string        `bson:"post_id" json:"post_id"`
 	ApprovalPostID    string        `bson:"approval_post_id" json:"approval_post_id"`
-	Type              string        `bson:"type" json:"type"`
+	Type              LeaveType     `bson:"type" json:"type"`
 	StartDate         string        `bson:"start_date" json:"start_date"`
 	EndDate           string        `bson:"end_date" json:"end_date"`
-	Days              int           `bson:"days" json:"days"`
 	Reason            string        `bson:"reason" json:"reason"`
-	Status            string        `bson:"status" json:"status"`
+	ExpectedTime      string        `bson:"expected_time,omitempty" json:"expected_time,omitempty"` // HH:MM for late arrival / early departure
+	Status            LeaveStatus   `bson:"status" json:"status"`
 	ApproverID        string        `bson:"approver_id,omitempty" json:"approver_id"`
 	ApproverUsername  string        `bson:"approver_username,omitempty" json:"approver_username"`
 	ApprovedAt        *time.Time    `bson:"approved_at,omitempty" json:"approved_at"`

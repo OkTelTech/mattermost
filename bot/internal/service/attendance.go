@@ -161,7 +161,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	return msg, nil
 }
 
-func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID, leaveType, startDate, endDate, reason string) error {
+func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, startDate, endDate, reason, timeStr string) error {
 	// Lookup username if not provided (dialog submissions may omit it)
 	if username == "" {
 		user, err := s.mm.GetUser(userID)
@@ -171,9 +171,13 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		username = user.Username
 	}
 
-	days, err := calcDays(startDate, endDate)
-	if err != nil {
-		return fmt.Errorf("calc days: %w", err)
+	// For late arrival / early departure: single date, no range needed
+	if leaveType == model.LeaveTypeLateArrival || leaveType == model.LeaveTypeEarlyDeparture {
+		endDate = startDate
+	}
+
+	if err := validateDates(startDate, endDate); err != nil {
+		return fmt.Errorf("validate dates: %w", err)
 	}
 
 	// Resolve approval channel before creating any posts
@@ -197,8 +201,8 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		Type:              leaveType,
 		StartDate:         startDate,
 		EndDate:           endDate,
-		Days:              days,
 		Reason:            reason,
+		ExpectedTime:      timeStr,
 		Status:            model.LeaveStatusPending,
 	}
 	if err := s.store.CreateLeaveRequest(ctx, req); err != nil {
@@ -207,7 +211,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 
 	idHex := req.ID.Hex()
 	leaveTypeName := leaveTypeLabel(leaveType)
-	infoMsg := formatLeaveMsg(username, leaveTypeName, startDate, endDate, days, reason, "Pending", "")
+	infoMsg := formatLeaveMsg(username, leaveTypeName, leaveType, startDate, endDate, reason, timeStr, "Pending", "")
 
 	// Post info message to main channel (no buttons)
 	infoPost, err := s.mm.CreatePost(&mattermost.Post{
@@ -289,8 +293,8 @@ func (s *AttendanceService) ApproveLeave(ctx context.Context, requestID, approve
 		return "", fmt.Errorf("update leave request: %w", err)
 	}
 
-	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type),
-		req.StartDate, req.EndDate, req.Days, req.Reason,
+	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type), req.Type,
+		req.StartDate, req.EndDate, req.Reason, req.ExpectedTime,
 		"**APPROVED**", fmt.Sprintf("| **Approved by** | @%s at %s |", approverUsername, now.Format(time.TimeOnly)))
 
 	// Update info post in main channel
@@ -337,9 +341,14 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 		return "", fmt.Errorf("update leave request: %w", err)
 	}
 
-	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type),
-		req.StartDate, req.EndDate, req.Days, req.Reason,
-		"**REJECTED**", fmt.Sprintf("| **Rejected by** | @%s at %s |", rejecterUsername, now.Format(time.TimeOnly)))
+	extra := fmt.Sprintf("| **Rejected by** | @%s at %s |", rejecterUsername, now.Format(time.TimeOnly))
+	if reason != "" {
+		extra += fmt.Sprintf("\n| **Reject reason** | %s |", reason)
+	}
+
+	updatedMsg := formatLeaveMsg(req.Username, leaveTypeLabel(req.Type), req.Type,
+		req.StartDate, req.EndDate, req.Reason, req.ExpectedTime,
+		"**REJECTED**", extra)
 
 	// Update info post in main channel
 	s.mm.UpdatePost(req.PostID, &mattermost.Post{
@@ -347,38 +356,58 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 		Message:   updatedMsg,
 	})
 
-	s.mm.SendDM(req.UserID, fmt.Sprintf("Your leave request (%s, %s → %s) was **REJECTED** by @%s",
-		leaveTypeLabel(req.Type), req.StartDate, req.EndDate, rejecterUsername))
+	// Update approval post (remove buttons, show updated status)
+	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
+		ChannelID: req.ApprovalChannelID,
+		Message:   updatedMsg,
+		Props:     mattermost.Props{Attachments: []mattermost.Attachment{}},
+	})
+
+	dmMsg := fmt.Sprintf("Your leave request (%s, %s → %s) was **REJECTED** by @%s",
+		leaveTypeLabel(req.Type), req.StartDate, req.EndDate, rejecterUsername)
+	if reason != "" {
+		dmMsg += fmt.Sprintf("\n> **Reason:** %s", reason)
+	}
+	s.mm.SendDM(req.UserID, dmMsg)
 
 	return updatedMsg, nil
 }
 
-func calcDays(start, end string) (int, error) {
+func validateDates(start, end string) error {
 	s, err := time.Parse("2006-01-02", start)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	e, err := time.Parse("2006-01-02", end)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	days := int(e.Sub(s).Hours()/24) + 1
-	if days < 1 {
-		return 0, fmt.Errorf("end date must be after start date")
+	if e.Before(s) {
+		return fmt.Errorf("end date must not be before start date")
 	}
-	return days, nil
+	return nil
 }
 
-func formatLeaveMsg(username, leaveType, startDate, endDate string, days int, reason, status, extra string) string {
-	msg := fmt.Sprintf("#### Leave Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Type** | %s |\n| **Date** | %s → %s (%d days) |\n| **Reason** | %s |\n| **Status** | %s |",
-		username, leaveType, startDate, endDate, days, reason, status)
+func formatLeaveMsg(username, leaveTypeName string, leaveTypeRaw model.LeaveType, startDate, endDate, reason, timeStr, status, extra string) string {
+	var msg string
+	switch leaveTypeRaw {
+	case model.LeaveTypeLateArrival:
+		msg = fmt.Sprintf("#### Late Arrival Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Date** | %s |\n| **Expected Arrival** | %s |\n| **Reason** | %s |\n| **Status** | %s |",
+			username, startDate, timeStr, reason, status)
+	case model.LeaveTypeEarlyDeparture:
+		msg = fmt.Sprintf("#### Early Departure Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Date** | %s |\n| **Expected Departure** | %s |\n| **Reason** | %s |\n| **Status** | %s |",
+			username, startDate, timeStr, reason, status)
+	default:
+		msg = fmt.Sprintf("#### Leave Request\n| | |\n|:--|:--|\n| **User** | @%s |\n| **Type** | %s |\n| **Date** | %s → %s |\n| **Reason** | %s |\n| **Status** | %s |",
+			username, leaveTypeName, startDate, endDate, reason, status)
+	}
 	if extra != "" {
 		msg += "\n" + extra
 	}
 	return msg
 }
 
-func leaveTypeLabel(t string) string {
+func leaveTypeLabel(t model.LeaveType) string {
 	switch t {
 	case model.LeaveTypeAnnual:
 		return "Annual Leave"
@@ -386,7 +415,11 @@ func leaveTypeLabel(t string) string {
 		return "Emergency Leave"
 	case model.LeaveTypeSick:
 		return "Sick Leave"
+	case model.LeaveTypeLateArrival:
+		return "Late Arrival"
+	case model.LeaveTypeEarlyDeparture:
+		return "Early Departure"
 	default:
-		return t
+		return string(t)
 	}
 }

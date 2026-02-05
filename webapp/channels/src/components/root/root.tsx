@@ -59,6 +59,7 @@ const DoVerifyEmail = makeAsyncComponent('DoVerifyEmail', lazy(() => import('com
 const ClaimController = makeAsyncComponent('ClaimController', lazy(() => import('components/claim')));
 const TermsOfService = makeAsyncComponent('TermsOfService', lazy(() => import('components/terms_of_service')));
 const LinkingLandingPage = makeAsyncComponent('LinkingLandingPage', lazy(() => import('components/linking_landing_page')));
+const AppsPage = makeAsyncComponent('AppsPage', lazy(() => import('components/apps_page')));
 const AdminConsole = makeAsyncComponent('AdminConsole', lazy(() => import('components/admin_console')));
 const SelectTeam = makeAsyncComponent('SelectTeam', lazy(() => import('components/select_team')));
 const Authorize = makeAsyncComponent('Authorize', lazy(() => import('components/authorize')));
@@ -370,6 +371,10 @@ export default class Root extends React.PureComponent<Props, State> {
                     <Route
                         path={'/landing'}
                         component={LinkingLandingPage}
+                    />
+                    <HFRoute
+                        path={'/apps'}
+                        component={AppsPage}
                     />
                     {this.props.isDevModeEnabled && (
                         <Route

@@ -62,6 +62,9 @@ services:
       # Disable telemetry for local dev
       MM_LOGSETTINGS_ENABLEDIAGNOSTICS: "false"
 
+      # Allow backend to call bot service (internal docker hostname)
+      MM_SERVICESETTINGS_ALLOWEDUNTRUSTEDINTERNALCONNECTIONS: "bot"
+
       # Plugin settings - Enable Calls
       MM_PLUGINSETTINGS_ENABLE: "true"
       MM_PLUGINSETTINGS_ENABLEUPLOADS: "true"
@@ -108,8 +111,56 @@ services:
       start_period: 10s
       retries: 3
 
+  # ==========================================================================
+  # MongoDB (for Bot Service)
+  # ==========================================================================
+  mongodb:
+    image: mongo:7
+    container_name: mm-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Bot Service (Attendance + Budget)
+  # ==========================================================================
+  bot:
+    build:
+      context: ../bot
+      dockerfile: Dockerfile
+    container_name: mm-bot
+    environment:
+      PORT: "3000"
+      ENV: development
+      BOT_URL: "http://bot:3000"
+      MONGODB_URI: "mongodb://mongodb:27017"
+      MONGODB_DATABASE: oktel
+      MATTERMOST_URL: "http://backend:8065"
+      # Tokens will be set after creating bot accounts in Mattermost
+      ATTENDANCE_BOT_TOKEN: "${ATTENDANCE_BOT_TOKEN:-}"
+      BUDGET_BOT_TOKEN: "${BUDGET_BOT_TOKEN:-}"
+    ports:
+      - "3000:3000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
   backend_data:
   backend_logs:
   backend_plugins:
+  mongo_data:

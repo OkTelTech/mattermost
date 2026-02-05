@@ -143,11 +143,11 @@ const (
 
 	EmailSettingsDefaultFeedbackOrganization = ""
 
-	SupportSettingsDefaultTermsOfServiceLink = "https://mattermost.com/pl/terms-of-use/"
-	SupportSettingsDefaultPrivacyPolicyLink  = "https://mattermost.com/pl/privacy-policy/"
-	SupportSettingsDefaultAboutLink          = "https://mattermost.com/pl/about-mattermost"
-	SupportSettingsDefaultHelpLink           = "https://mattermost.com/pl/help/"
-	SupportSettingsDefaultReportAProblemLink = "https://mattermost.com/pl/report-a-bug"
+	SupportSettingsDefaultTermsOfServiceLink = "https://oktel.io/pl/terms-of-use/"
+	SupportSettingsDefaultPrivacyPolicyLink  = "https://oktel.io/pl/privacy-policy/"
+	SupportSettingsDefaultAboutLink          = "https://oktel.io/pl/about-mattermost"
+	SupportSettingsDefaultHelpLink           = "https://oktel.io/pl/help/"
+	SupportSettingsDefaultReportAProblemLink = "https://oktel.io/pl/report-a-bug"
 	SupportSettingsDefaultSupportEmail       = ""
 	SupportSettingsDefaultReAcceptancePeriod = 365
 
@@ -190,9 +190,13 @@ const (
 	SamlSettingsCanonicalAlgorithmC14n11  = "Canonical1.1"
 	SamlSettingsDefaultCanonicalAlgorithm = SamlSettingsCanonicalAlgorithmC14n
 
-	NativeappSettingsDefaultAppDownloadLink        = "https://mattermost.com/pl/download-apps"
-	NativeappSettingsDefaultAndroidAppDownloadLink = "https://mattermost.com/pl/android-app/"
-	NativeappSettingsDefaultIosAppDownloadLink     = "https://mattermost.com/pl/ios-app/"
+	NativeappSettingsDefaultAppDownloadLink         = "https://oktel.io/apps"
+	NativeappSettingsDefaultAndroidAppDownloadLink  = "https://play.google.com/store/apps/details?id=com.ok.tel"
+	NativeappSettingsDefaultIosAppDownloadLink      = "https://testflight.apple.com/join/WEkJUyRP"
+	NativeappSettingsDefaultWindowsAppDownloadLink  = "https://drive.google.com/file/d/1NSCvIOLjYkWlGbAkqDNziXIWMi3CQFgG/view"
+	NativeappSettingsDefaultLinuxAppDownloadLink    = "https://drive.google.com/drive/folders/1omFPzJffPfLVRpuGjNJAqJSN-ojt481G"
+	NativeappSettingsDefaultMacIntelAppDownloadLink = "https://drive.google.com/file/d/1lGiysFNa5nVGR08ewDGKPlZ2qSI0-Lyb/view"
+	NativeappSettingsDefaultMacMAppDownloadLink     = "https://drive.google.com/file/d/1N_tjeJoveMDHEErjPWfeJxqHIcOKPAYj/view"
 
 	ExperimentalSettingsDefaultLinkMetadataTimeoutMilliseconds                       = 5000
 	ExperimentalSettingsDefaultUsersStatusAndProfileFetchingPollIntervalMilliseconds = 3000
@@ -3060,6 +3064,10 @@ func (s *SamlSettings) SetDefaults() {
 type NativeAppSettings struct {
 	AppCustomURLSchemes           []string `access:"site_customization,write_restrictable,cloud_restrictable"` // telemetry: none
 	AppDownloadLink               *string  `access:"site_customization,write_restrictable,cloud_restrictable"`
+	WindowsAppDownloadLink        *string  `access:"site_customization,write_restrictable,cloud_restrictable"`
+	LinuxAppDownloadLink          *string  `access:"site_customization,write_restrictable,cloud_restrictable"`
+	MacosIntelAppDownloadLink     *string  `access:"site_customization,write_restrictable,cloud_restrictable"`
+	MacosMAppDownloadLink         *string  `access:"site_customization,write_restrictable,cloud_restrictable"`
 	AndroidAppDownloadLink        *string  `access:"site_customization,write_restrictable,cloud_restrictable"`
 	IosAppDownloadLink            *string  `access:"site_customization,write_restrictable,cloud_restrictable"`
 	MobileExternalBrowser         *bool    `access:"site_customization,write_restrictable,cloud_restrictable"`
@@ -3074,6 +3082,22 @@ type NativeAppSettings struct {
 func (s *NativeAppSettings) SetDefaults() {
 	if s.AppDownloadLink == nil {
 		s.AppDownloadLink = NewPointer(NativeappSettingsDefaultAppDownloadLink)
+	}
+
+	if s.WindowsAppDownloadLink == nil {
+		s.WindowsAppDownloadLink = NewPointer(NativeappSettingsDefaultWindowsAppDownloadLink)
+	}
+
+	if s.LinuxAppDownloadLink == nil {
+		s.LinuxAppDownloadLink = NewPointer(NativeappSettingsDefaultLinuxAppDownloadLink)
+	}
+
+	if s.MacosIntelAppDownloadLink == nil {
+		s.MacosIntelAppDownloadLink = NewPointer(NativeappSettingsDefaultMacIntelAppDownloadLink)
+	}
+
+	if s.MacosMAppDownloadLink == nil {
+		s.MacosMAppDownloadLink = NewPointer(NativeappSettingsDefaultMacMAppDownloadLink)
 	}
 
 	if s.AndroidAppDownloadLink == nil {

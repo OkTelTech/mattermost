@@ -84,6 +84,15 @@ func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	channelName := r.FormValue("channel_name")
+	if !strings.HasPrefix(channelName, "attendance") {
+		writeJSON(w, SlashResponse{
+			ResponseType: "ephemeral",
+			Text:         "This command can only be used in channels with the `attendance` prefix.",
+		})
+		return
+	}
+
 	writeJSON(w, SlashResponse{
 		ResponseType: "ephemeral",
 		Attachments: []mattermost.Attachment{

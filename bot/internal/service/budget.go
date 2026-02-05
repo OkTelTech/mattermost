@@ -135,13 +135,14 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, na
 }
 
 // SubmitContent handles step 2: Partner submits content info from budget-partner-{partner}.
-func (s *BudgetService) SubmitContent(ctx context.Context, requestID, postContent, postLink, pageLink string) error {
+func (s *BudgetService) SubmitContent(ctx context.Context, requestID, userID, postContent, postLink, pageLink string) error {
 	req, err := s.getAndValidate(ctx, requestID, model.BudgetStepSaleCreated)
 	if err != nil {
 		return err
 	}
 
 	now := time.Now()
+	req.PartnerUserID = userID
 	req.PostContent = postContent
 	req.PostLink = postLink
 	req.PageLink = pageLink
@@ -161,29 +162,58 @@ func (s *BudgetService) SubmitContent(ctx context.Context, requestID, postConten
 	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
 		ChannelID: req.PartnerChannelID,
 		Message:   infoMsg + contentDetail,
-	})
-
-	// Create post in budget-tlqc with confirm button
-	tlqcPost, err := s.mm.CreatePost(&mattermost.Post{
-		ChannelID: req.TLQCChannelID,
-		Message:   "@all\n" + infoMsg + contentDetail,
 		Props: mattermost.Props{
-			Attachments: []mattermost.Attachment{{
-				Actions: []mattermost.Action{
-					{
-						Name: "Confirm",
-						Type: "button",
-						Integration: mattermost.Integration{
-							URL:     s.botURL + "/api/budget/tlqc-confirm",
-							Context: map[string]any{"request_id": idHex},
-						},
-					},
-				},
-			}},
+			Attachments: []mattermost.Attachment{},
 		},
 	})
-	if err != nil {
-		return fmt.Errorf("post to tlqc channel: %w", err)
+
+	tlqcProps := mattermost.Props{
+		Attachments: []mattermost.Attachment{{
+			Actions: []mattermost.Action{
+				{
+					Name: "Confirm",
+					Type: "button",
+					Integration: mattermost.Integration{
+						URL:     s.botURL + "/api/budget/tlqc-confirm",
+						Context: map[string]any{"request_id": idHex},
+					},
+				},
+				{
+					Name: "Return to Partner",
+					Type: "button",
+					Integration: mattermost.Integration{
+						URL:     s.botURL + "/api/budget/tlqc-return-form",
+						Context: map[string]any{"request_id": idHex},
+					},
+				},
+			},
+		}},
+	}
+
+	if req.TLQCPostID != "" {
+		// Resubmit: update existing TLQC post and notify in thread
+		s.mm.UpdatePost(req.TLQCPostID, &mattermost.Post{
+			ChannelID: req.TLQCChannelID,
+			Message:   infoMsg + contentDetail,
+			Props:     tlqcProps,
+		})
+		tlqcMention := s.userMention(req.TLQCUserID)
+		s.mm.CreatePost(&mattermost.Post{
+			ChannelID: req.TLQCChannelID,
+			RootID:    req.TLQCPostID,
+			Message:   tlqcMention + " Partner has resubmitted the content. Please review.",
+		})
+	} else {
+		// First submit: create new TLQC post
+		tlqcPost, err := s.mm.CreatePost(&mattermost.Post{
+			ChannelID: req.TLQCChannelID,
+			Message:   "@all\n" + infoMsg + contentDetail,
+			Props:     tlqcProps,
+		})
+		if err != nil {
+			return fmt.Errorf("post to tlqc channel: %w", err)
+		}
+		req.TLQCPostID = tlqcPost.ID
 	}
 
 	// Update sale post status
@@ -192,7 +222,6 @@ func (s *BudgetService) SubmitContent(ctx context.Context, requestID, postConten
 		Message:   infoMsg,
 	})
 
-	req.TLQCPostID = tlqcPost.ID
 	return s.store.Update(ctx, req)
 }
 
@@ -219,6 +248,9 @@ func (s *BudgetService) ConfirmTLQC(ctx context.Context, requestID, userID strin
 	s.mm.UpdatePost(req.TLQCPostID, &mattermost.Post{
 		ChannelID: req.TLQCChannelID,
 		Message:   infoMsg,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{},
+		},
 	})
 
 	// Update partner post with payment button
@@ -239,6 +271,84 @@ func (s *BudgetService) ConfirmTLQC(ctx context.Context, requestID, userID strin
 				},
 			}},
 		},
+	})
+
+	// Notify partner user in thread to fill payment info
+	partnerMention := s.userMention(req.PartnerUserID)
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.PartnerChannelID,
+		RootID:    req.PartnerPostID,
+		Message:   partnerMention + " Content confirmed by TLQC. Please fill in the payment info.",
+	})
+
+	// Update sale post status
+	s.mm.UpdatePost(req.SalePostID, &mattermost.Post{
+		ChannelID: req.SaleChannelID,
+		Message:   infoMsg,
+	})
+
+	return nil
+}
+
+// ReturnToPartner handles TLQC returning content to partner for rework.
+func (s *BudgetService) ReturnToPartner(ctx context.Context, requestID, userID, reason string) error {
+	req, err := s.getAndValidate(ctx, requestID, model.BudgetStepPartnerContent)
+	if err != nil {
+		return err
+	}
+
+	partnerMention := s.userMention(req.PartnerUserID)
+
+	// Reset to step 1 so partner can resubmit content; keep TLQCPostID for reuse
+	req.TLQCUserID = userID
+	req.PartnerUserID = ""
+	req.PostContent = ""
+	req.PostLink = ""
+	req.PageLink = ""
+	req.ContentAt = nil
+	req.CurrentStep = model.BudgetStepSaleCreated
+
+	if err := s.store.Update(ctx, req); err != nil {
+		return err
+	}
+
+	idHex := req.ID.Hex()
+	infoMsg := formatBudgetStatus(req, "Step 1/6 - Returned by TLQC, please redo content")
+
+	// Update TLQC post (remove buttons)
+	s.mm.UpdatePost(req.TLQCPostID, &mattermost.Post{
+		ChannelID: req.TLQCChannelID,
+		Message:   formatBudgetStatus(req, "Returned to Partner for rework"),
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{},
+		},
+	})
+
+	// Update partner post with Fill Post Content button again
+	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
+		ChannelID: req.PartnerChannelID,
+		Message:   infoMsg,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{{
+				Actions: []mattermost.Action{
+					{
+						Name: "Fill Post Content",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/budget/partner-content-form",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+				},
+			}},
+		},
+	})
+
+	// Notify partner in thread with reason
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.PartnerChannelID,
+		RootID:    req.PartnerPostID,
+		Message:   fmt.Sprintf("%s Content returned by TLQC. Please redo and resubmit.\n**Reason:** %s", partnerMention, reason),
 	})
 
 	// Update sale post status
@@ -278,6 +388,9 @@ func (s *BudgetService) SubmitPayment(ctx context.Context, requestID, recipientN
 	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
 		ChannelID: req.PartnerChannelID,
 		Message:   infoMsg + paymentDetail,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{},
+		},
 	})
 
 	// Create post in budget-approval with approve + reject buttons
@@ -344,6 +457,9 @@ func (s *BudgetService) Approve(ctx context.Context, requestID, userID string) e
 	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
 		Message:   infoMsg,
+		Props: mattermost.Props{
+			Attachments: []mattermost.Attachment{},
+		},
 	})
 
 	// Create post in budget-finance with complete button
@@ -448,6 +564,9 @@ func (s *BudgetService) updateAllPosts(req *model.BudgetRequest, msg string) {
 			s.mm.UpdatePost(p.postID, &mattermost.Post{
 				ChannelID: p.channelID,
 				Message:   msg,
+				Props: mattermost.Props{
+					Attachments: []mattermost.Attachment{},
+				},
 			})
 		}
 	}
@@ -496,4 +615,16 @@ func formatCompletedMsg(req *model.BudgetRequest) string {
 
 func formatRejectedMsg(req *model.BudgetRequest) string {
 	return formatBudgetInfo(req) + fmt.Sprintf("\n| **Status** | **REJECTED** at step %d |", req.CurrentStep)
+}
+
+// userMention returns a @username mention for a user ID, falling back to @all on error.
+func (s *BudgetService) userMention(userID string) string {
+	if userID == "" {
+		return "@all"
+	}
+	user, err := s.mm.GetUser(userID)
+	if err != nil {
+		return "@all"
+	}
+	return "@" + user.Username
 }

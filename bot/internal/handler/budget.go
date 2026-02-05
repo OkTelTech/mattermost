@@ -140,6 +140,7 @@ func (h *BudgetHandler) HandlePartnerContentSubmit(w http.ResponseWriter, r *htt
 	err := h.svc.SubmitContent(
 		r.Context(),
 		sub.CallbackID,
+		sub.UserID,
 		sub.Submission["post_content"],
 		sub.Submission["post_link"],
 		sub.Submission["page_link"],
@@ -168,6 +169,57 @@ func (h *BudgetHandler) HandleTLQCConfirm(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, ActionResponse{EphemeralText: "TLQC confirmed. Waiting for payment info..."})
+}
+
+// HandleTLQCReturnForm opens the return reason dialog for TLQC.
+func (h *BudgetHandler) HandleTLQCReturnForm(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	requestID, _ := req.Context["request_id"].(string)
+
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/budget/tlqc-return",
+		Dialog: mattermost.Dialog{
+			Title:       "Return to Partner",
+			CallbackID:  requestID,
+			SubmitLabel: "Return",
+			Elements: []mattermost.DialogElement{
+				{DisplayName: "Reason", Name: "reason", Type: "textarea"},
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("ERROR open tlqc return dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form."})
+		return
+	}
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleTLQCReturnSubmit processes the TLQC return dialog submission.
+func (h *BudgetHandler) HandleTLQCReturnSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	err := h.svc.ReturnToPartner(r.Context(), sub.CallbackID, sub.UserID, sub.Submission["reason"])
+	if err != nil {
+		log.Printf("ERROR return to partner: %v", err)
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // HandlePartnerPaymentForm opens the payment info dialog for partner.
@@ -336,8 +388,10 @@ func (h *BudgetHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/budget/partner-content-form", h.HandlePartnerContentForm)
 	mux.HandleFunc("POST /api/budget/partner-content", h.HandlePartnerContentSubmit)
 
-	// TLQC confirmation
+	// TLQC confirmation + return
 	mux.HandleFunc("POST /api/budget/tlqc-confirm", h.HandleTLQCConfirm)
+	mux.HandleFunc("POST /api/budget/tlqc-return-form", h.HandleTLQCReturnForm)
+	mux.HandleFunc("POST /api/budget/tlqc-return", h.HandleTLQCReturnSubmit)
 
 	// Partner payment
 	mux.HandleFunc("POST /api/budget/partner-payment-form", h.HandlePartnerPaymentForm)

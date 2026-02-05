@@ -60,6 +60,7 @@ type BudgetRequest struct {
 	Deadline   string `bson:"deadline" json:"deadline"`
 
 	// Step 2: Partner Content
+	PartnerUserID string     `bson:"partner_user_id,omitempty" json:"partner_user_id"`
 	PostContent   string     `bson:"post_content,omitempty" json:"post_content"`
 	PostLink      string     `bson:"post_link,omitempty" json:"post_link"`
 	PageLink      string     `bson:"page_link,omitempty" json:"page_link"`

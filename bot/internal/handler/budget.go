@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/service"
@@ -23,6 +24,15 @@ func NewBudgetHandler(svc *service.BudgetService, mm *mattermost.Client, botURL 
 func (h *BudgetHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	channelName := r.FormValue("channel_name")
+	if !strings.HasPrefix(channelName, "budget") {
+		writeJSON(w, SlashResponse{
+			ResponseType: "ephemeral",
+			Text:         "This command can only be used in channels with the `budget` prefix.",
+		})
 		return
 	}
 

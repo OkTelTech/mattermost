@@ -6629,5 +6629,6 @@
   "yourcomputer": "Din dator",
   "youtube_video.play.aria_label": "Spela {videoTitle} på YouTube",
   "youtube_video.play_button.aria_label": "Visa video",
-  "youtube_video.thumbnail.alt_text": "Miniatyrbild för {videoTitle} på YouTube"
+  "youtube_video.thumbnail.alt_text": "Miniatyrbild för {videoTitle} på YouTube",
+  "plugin.upload": "Röstmeddelande"
 }

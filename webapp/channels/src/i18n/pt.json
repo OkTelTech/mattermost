@@ -2041,5 +2041,6 @@
   "workspace_limits.modals.view_plans": "Ver Planos",
   "workspace_limits.teams_limit_reached.upgrade_to_unarchive": "Atualizar para Desarquivar",
   "workspace_limits.teams_limit_reached.view_upgrade_options": "Ver opções de atualização",
-  "yourcomputer": "O seu computador"
+  "yourcomputer": "O seu computador",
+  "plugin.upload": "Mensagem de voz"
 }

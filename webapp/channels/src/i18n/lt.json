@@ -4757,5 +4757,6 @@
   "workspace_limits.teams_limit_reached.view_upgrade_options": "Peržiūrėti atnaujinimo parinktis",
   "workspace_limits.upgrade": "Naujovinkite, kad išvengtumėte {planName} duomenų apribojimų",
   "workspace_limits.upgrade_reasons.free": "{planName} apribota iki {messagesLimit} pranešimų istorijos ir {storageLimit} failų saugyklos. Galite ištrinti elementus, kad atlaisvintumėte vietos arba naujovintumėte į mokamą planą.",
-  "yourcomputer": "Jūsų kompiuteris"
+  "yourcomputer": "Jūsų kompiuteris",
+  "plugin.upload": "Balso žinutė"
 }

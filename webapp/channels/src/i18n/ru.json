@@ -5595,5 +5595,6 @@
   "workspace_limits.teams_limit_reached.view_upgrade_options": "Посмотреть варианты обновления",
   "workspace_limits.upgrade": "Обновите, чтобы избежать ограничений на данные у {planName}",
   "workspace_limits.upgrade_reasons.free": "{planName} ограничено: {messagesLimit} сообщений в истории и {storageLimit} хранилище файлов. Вы можете удалить элементы, чтобы освободить место, или перейти на платный тарифный план.",
-  "yourcomputer": "Ваш компьютер"
+  "yourcomputer": "Ваш компьютер",
+  "plugin.upload": "Голосовое сообщение"
 }

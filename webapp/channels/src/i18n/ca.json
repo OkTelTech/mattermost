@@ -126,5 +126,6 @@
   "user.settings.security.logoutActiveSessions.icon": "Icona de sessions actives",
   "user.settings.security.passwordError": "La contrasenya cal que tingui entre {min} i {max} caràcters",
   "web.header.logout": "Tanca sessió",
-  "web.root.signup_info": "Tota la comunicació del teu equip en un lloc, amb cerca instantània i accessible des de qualsevol lloc."
+  "web.root.signup_info": "Tota la comunicació del teu equip en un lloc, amb cerca instantània i accessible des de qualsevol lloc.",
+  "plugin.upload": "Missatge de veu"
 }

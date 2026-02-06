@@ -73,5 +73,6 @@
   "apps.error.lookup.error_preparing_request": "অনুসন্ধান অনুরোধ প্রস্তুত করার সময় ত্রুটি: {errorMessage}",
   "apps.error.parser": "বিশ্লেষণ ত্রুটি: {ত্রুটি}",
   "apps.error.parser.empty_value": "খালি মান অনুমোদিত নয়",
-  "apps.error.parser.missing_field_value": "field মান অনুপস্থিত."
+  "apps.error.parser.missing_field_value": "field মান অনুপস্থিত.",
+  "plugin.upload": "ভয়েস বার্তা"
 }

@@ -6749,5 +6749,6 @@
   "yourcomputer": "Dein Computer",
   "youtube_video.play.aria_label": "{videoTitle} auf YouTube abspielen",
   "youtube_video.play_button.aria_label": "Video abspielen",
-  "youtube_video.thumbnail.alt_text": "Vorschaubild für {videoTitle} auf YouTube"
+  "youtube_video.thumbnail.alt_text": "Vorschaubild für {videoTitle} auf YouTube",
+  "plugin.upload": "Sprachnachricht"
 }

@@ -6749,5 +6749,6 @@
   "yourcomputer": "Jouw computer",
   "youtube_video.play.aria_label": "{videoTitle} afspelen op YouTube",
   "youtube_video.play_button.aria_label": "Video afspelen",
-  "youtube_video.thumbnail.alt_text": "Miniatuurafbeelding voor {videoTitle} op YouTube"
+  "youtube_video.thumbnail.alt_text": "Miniatuurafbeelding voor {videoTitle} op YouTube",
+  "plugin.upload": "Spraakbericht"
 }

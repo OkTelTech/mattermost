@@ -33,7 +33,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return "", fmt.Errorf("get today record: %w", err)
 	}
 	if record != nil {
-		return "", fmt.Errorf("@%s already checked in today at %s", username, record.CheckIn.Format(time.TimeOnly))
+		return "", fmt.Errorf("@%s already checked in today", username)
 	}
 
 	record = &model.AttendanceRecord{
@@ -48,7 +48,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return "", fmt.Errorf("create record: %w", err)
 	}
 
-	msg := fmt.Sprintf("@%s checked in at %s", username, now.Format(time.TimeOnly))
+	msg := fmt.Sprintf("@%s checked in", username)
 	post, err := s.mm.CreatePost(&mattermost.Post{ChannelID: channelID, Message: msg})
 	if err != nil {
 		return "", fmt.Errorf("create post: %w", err)
@@ -89,7 +89,7 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 		return "", err
 	}
 
-	msg := fmt.Sprintf("@%s started break at %s — %s", username, now.Format(time.TimeOnly), reason)
+	msg := fmt.Sprintf("@%s started break — %s", username, reason)
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }
@@ -117,7 +117,7 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 		return "", err
 	}
 
-	msg := fmt.Sprintf("@%s ended break at %s", username, now.Format(time.TimeOnly))
+	msg := fmt.Sprintf("@%s ended break", username)
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }
@@ -134,7 +134,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		return "", fmt.Errorf("@%s has not checked in today", username)
 	}
 	if record.CheckOut != nil {
-		return "", fmt.Errorf("@%s already checked out at %s", username, record.CheckOut.Format(time.TimeOnly))
+		return "", fmt.Errorf("@%s already checked out today", username)
 	}
 
 	record.CheckOut = &now
@@ -153,7 +153,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		totalBreak += end.Sub(b.Start)
 	}
 
-	msg := fmt.Sprintf("@%s checked out at %s", username, now.Format(time.TimeOnly))
+	msg := fmt.Sprintf("@%s checked out", username)
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
 }

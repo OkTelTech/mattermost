@@ -28,6 +28,7 @@ type LeaveRequest struct {
 	ID                bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	UserID            string        `bson:"user_id" json:"user_id"`
 	Username          string        `bson:"username" json:"username"`
+	TeamID            string        `bson:"team_id" json:"team_id"`
 	ChannelID         string        `bson:"channel_id" json:"channel_id"`
 	ApprovalChannelID string        `bson:"approval_channel_id" json:"approval_channel_id"`
 	PostID            string        `bson:"post_id" json:"post_id"`

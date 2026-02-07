@@ -35,7 +35,8 @@ func PartnerChannelName(partner string) string {
 
 type BudgetRequest struct {
 	ID          bson.ObjectID `bson:"_id,omitempty" json:"id"`
-	CurrentStep BudgetStep `bson:"current_step" json:"current_step"`
+	TeamID      string        `bson:"team_id" json:"team_id"`
+	CurrentStep BudgetStep    `bson:"current_step" json:"current_step"`
 
 	// Channel IDs (resolved at creation, stored for later updates)
 	SaleChannelID     string `bson:"sale_channel_id" json:"sale_channel_id"`

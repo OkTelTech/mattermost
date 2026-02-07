@@ -77,6 +77,7 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, na
 	}
 
 	req := &model.BudgetRequest{
+		TeamID:            channelInfo.TeamID,
 		CurrentStep:       model.BudgetStepSaleCreated,
 		SaleChannelID:     channels.Sale,
 		PartnerChannelID:  channels.Partner,

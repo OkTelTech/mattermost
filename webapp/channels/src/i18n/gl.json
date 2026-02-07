@@ -1520,5 +1520,6 @@
   "user.settings.tokens.save": "Gardar",
   "user.settings.tokens.tokenLoading": "Cargando…",
   "view_image_popover.download": "Descargar",
-  "yourcomputer": "O seu computador"
+  "yourcomputer": "O seu computador",
+  "plugin.upload": "Mensaxe de voz"
 }

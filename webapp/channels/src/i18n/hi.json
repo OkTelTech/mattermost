@@ -2054,5 +2054,6 @@
   "widgets.users_emails_input.loading": "लोडिंग",
   "workspace_limits.file_storage": "फ़ाइल संग्रहण",
   "workspace_limits.message_history": "संदेश इतिहास",
-  "yourcomputer": "आपका कंप्यूटर"
+  "yourcomputer": "आपका कंप्यूटर",
+  "plugin.upload": "वॉइस संदेश"
 }

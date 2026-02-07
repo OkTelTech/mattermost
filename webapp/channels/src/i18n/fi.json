@@ -1600,5 +1600,6 @@
   "web.footer.terms": "Ehdot",
   "web.header.logout": "Kirjaudu ulos",
   "web.root.signup_info": "Kaikki tiimien keskustelu yhdessä paikassa, helposti etsittävissä ja tavoitettavissa missä tahansa",
-  "yourcomputer": "Tietokoneesi"
+  "yourcomputer": "Tietokoneesi",
+  "plugin.upload": "Ääniviesti"
 }

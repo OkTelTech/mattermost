@@ -1883,5 +1883,6 @@
   "workspace_limits.menu_limit.notify_admin": "Obavijesti administratora",
   "workspace_limits.message_history.short": "Poruke",
   "workspace_limits.message_history.short.usage": "{actual} / {limit}",
-  "workspace_limits.modals.close": "Zatvori"
+  "workspace_limits.modals.close": "Zatvori",
+  "plugin.upload": "Glasovna poruka"
 }

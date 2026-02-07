@@ -4186,5 +4186,6 @@
   "workspace_limits.message_history": "Гісторыя паведамленняў",
   "workspace_limits.message_history.usage": "{actual} з {limit} паведамленняў ({percent}%)",
   "workspace_limits.upgrade": "Абнавіце, каб пазбегнуць абмежаванняў на дадзеныя ў {planName}",
-  "yourcomputer": "Ваш кампутар"
+  "yourcomputer": "Ваш кампутар",
+  "plugin.upload": "Голасавое паведамленне"
 }

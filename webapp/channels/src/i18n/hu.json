@@ -4442,5 +4442,6 @@
   "workspace_limits.teams_limit_reached.upgrade_to_unarchive": "Emelje meg előfizetését az archiválás megszüntetéséhez",
   "workspace_limits.teams_limit_reached.view_upgrade_options": "Váltási lehetőségek megtekintése",
   "workspace_limits.upgrade": "Emelje meg előfizetését, hogy elkerülje a {planName} csomag adat korlátjait",
-  "yourcomputer": "A számítógéped"
+  "yourcomputer": "A számítógéped",
+  "plugin.upload": "Hangüzenet"
 }

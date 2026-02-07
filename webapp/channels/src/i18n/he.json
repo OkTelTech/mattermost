@@ -52,5 +52,6 @@
   "channel_header.directchannel.you": "{displayname} (את/ה) ",
   "navbar.addMembers": "הוסף חברים",
   "navbar_dropdown.manageMembers": "ניהול חברים",
-  "sidebar_left.sidebar_channel_menu.addMembers": "הוסף חברים"
+  "sidebar_left.sidebar_channel_menu.addMembers": "הוסף חברים",
+  "plugin.upload": "הודעה קולית"
 }

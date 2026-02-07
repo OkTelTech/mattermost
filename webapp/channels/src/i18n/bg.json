@@ -4502,5 +4502,6 @@
   "widgets.users_emails_input.loading": "Зареждане",
   "widgets.users_emails_input.no_user_found_matching": "Няма съвпадения за **{text}**, въведете ел.поща",
   "widgets.users_emails_input.valid_email": "Добави **{email}**",
-  "yourcomputer": "Твоят компютър"
+  "yourcomputer": "Твоят компютър",
+  "plugin.upload": "Гласово съобщение"
 }

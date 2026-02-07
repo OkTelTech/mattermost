@@ -6525,5 +6525,6 @@
   "yourcomputer": "あなたのコンピューター",
   "youtube_video.play.aria_label": "YouTubeで {videoTitle} を再生する",
   "youtube_video.play_button.aria_label": "動画を再生",
-  "youtube_video.thumbnail.alt_text": "YouTubeの {videoTitle} のサムネイル"
+  "youtube_video.thumbnail.alt_text": "YouTubeの {videoTitle} のサムネイル",
+  "plugin.upload": "音声メッセージ"
 }

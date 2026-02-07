@@ -29,5 +29,6 @@
   "accessibility.sidebar.types.public": "avalik kanal",
   "accessibility.sidebar.types.unread": "lugemata",
   "activity_log.activeSessions": "Aktiivsed Seansid",
-  "activity_log_modal.android": "Android"
+  "activity_log_modal.android": "Android",
+  "plugin.upload": "Häälsõnum"
 }

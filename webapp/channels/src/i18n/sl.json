@@ -1051,5 +1051,6 @@
   "web.footer.privacy": "Zasebnost",
   "web.footer.terms": "Pogoji",
   "web.header.logout": "Odjava",
-  "web.root.signup_info": "Vsa komunikacija vašega tima na enem mestu s takojšno možnostjo iskanja in dosegljivo vsepovsod"
+  "web.root.signup_info": "Vsa komunikacija vašega tima na enem mestu s takojšno možnostjo iskanja in dosegljivo vsepovsod",
+  "plugin.upload": "Govorna poraka"
 }

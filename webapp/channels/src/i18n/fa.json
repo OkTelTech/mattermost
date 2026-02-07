@@ -4132,5 +4132,6 @@
   "workspace_limits.modals.informational.title": "محدودیت‌های {planName}",
   "workspace_limits.modals.limits_reached.title.message_history": "تاریخچه پیام",
   "workspace_limits.modals.view_plans": "نمایش طرح‌ها",
-  "yourcomputer": "کامپیوتر شما"
+  "yourcomputer": "کامپیوتر شما",
+  "plugin.upload": "پیام صوتی"
 }

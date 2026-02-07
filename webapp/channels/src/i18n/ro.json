@@ -3673,5 +3673,6 @@
   "widgets.users_emails_input.loading": "Se încarcă",
   "widgets.users_emails_input.no_user_found_matching": "Nimeni nu a găsit potrivirea **{text}**, introduceți adresa de e-mail",
   "widgets.users_emails_input.valid_email": "Adaugă **{email}**",
-  "yourcomputer": "Computerul tău"
+  "yourcomputer": "Computerul tău",
+  "plugin.upload": "Mesaj vocal"
 }

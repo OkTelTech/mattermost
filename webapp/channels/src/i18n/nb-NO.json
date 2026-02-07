@@ -5609,5 +5609,6 @@
   "yourcomputer": "Din datamaskin",
   "youtube_video.play.aria_label": "Spill {videoTitle} på YouTube",
   "youtube_video.play_button.aria_label": "Spill av video",
-  "youtube_video.thumbnail.alt_text": "Miniatyrbilde for {videoTitle} på YouTube"
+  "youtube_video.thumbnail.alt_text": "Miniatyrbilde for {videoTitle} på YouTube",
+  "plugin.upload": "Stemmemeldinger"
 }

@@ -693,5 +693,6 @@
   "view_image_popover.download": "Download",
   "web.footer.privacy": "Privatliv",
   "web.header.logout": "Log ud",
-  "web.root.signup_info": "Al dit team kommunikation på ét sted, søgbare og tilgængelige overalt"
+  "web.root.signup_info": "Al dit team kommunikation på ét sted, søgbare og tilgængelige overalt",
+  "plugin.upload": "Stemmebeskeder"
 }

@@ -6785,5 +6785,6 @@
   "youtube_video.play_button.aria_label": "播放視頻",
   "youtube_video.play.aria_label": "在 YouTube 上播放 {videoTitle}",
   "youtube_video.thumbnail.alt_text": "YouTube 上的 {videoTitle} 的缩略圖",
-  "global_header.productChannels": "頻道"
+  "global_header.productChannels": "頻道",
+  "plugin.upload": "語音訊息"
 }

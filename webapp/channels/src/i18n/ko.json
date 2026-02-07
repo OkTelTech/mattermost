@@ -6467,5 +6467,6 @@
   "yourcomputer": "당신의 컴퓨터",
   "youtube_video.play.aria_label": "YouTube에서 {videoTitle} 재생",
   "youtube_video.play_button.aria_label": "동영상 재생",
-  "youtube_video.thumbnail.alt_text": "YouTube의 {videoTitle} 썸네일"
+  "youtube_video.thumbnail.alt_text": "YouTube의 {videoTitle} 썸네일",
+  "plugin.upload": "음성 메시지"
 }

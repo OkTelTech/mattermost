@@ -27,6 +27,7 @@ func NewAttendanceStore(ctx context.Context, db *MongoDB) (*AttendanceStore, err
 			Options: options.Index().SetUnique(true),
 		},
 		{Keys: bson.D{{Key: "date", Value: 1}}},
+		{Keys: bson.D{{Key: "team_id", Value: 1}, {Key: "date", Value: 1}}},
 	}); err != nil {
 		return nil, fmt.Errorf("create attendance indexes: %w", err)
 	}
@@ -34,6 +35,7 @@ func NewAttendanceStore(ctx context.Context, db *MongoDB) (*AttendanceStore, err
 	if _, err := leave.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "dates", Value: 1}}},
 		{Keys: bson.D{{Key: "dates", Value: 1}}},
+		{Keys: bson.D{{Key: "team_id", Value: 1}, {Key: "dates", Value: 1}}},
 	}); err != nil {
 		return nil, fmt.Errorf("create leave_requests indexes: %w", err)
 	}

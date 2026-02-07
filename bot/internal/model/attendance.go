@@ -30,6 +30,7 @@ type AttendanceRecord struct {
 	ID        bson.ObjectID    `bson:"_id,omitempty" json:"id"`
 	UserID    string           `bson:"user_id" json:"user_id"`
 	Username  string           `bson:"username" json:"username"`
+	TeamID    string           `bson:"team_id" json:"team_id"`
 	ChannelID string           `bson:"channel_id" json:"channel_id"`
 	PostID    string           `bson:"post_id" json:"post_id"` // checkin post ID for threading
 	Date      string           `bson:"date" json:"date"`       // YYYY-MM-DD

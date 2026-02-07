@@ -272,9 +272,6 @@ func (s *AttendanceService) ApproveLeave(ctx context.Context, requestID, approve
 	if req.Status != model.LeaveStatusPending {
 		return "", fmt.Errorf("request is already %s", req.Status)
 	}
-	if req.UserID == approverID {
-		return "", fmt.Errorf("cannot approve your own request")
-	}
 
 	now := time.Now()
 	req.Status = model.LeaveStatusApproved
@@ -320,9 +317,6 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 	}
 	if req.Status != model.LeaveStatusPending {
 		return "", fmt.Errorf("request is already %s", req.Status)
-	}
-	if req.UserID == rejecterID {
-		return "", fmt.Errorf("cannot reject your own request")
 	}
 
 	now := time.Now()

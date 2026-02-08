@@ -22,5 +22,6 @@
   "add_command.description": "Apraksts",
   "add_command.description.help": "Aprakstiet ienākošo tīmekļa āķi.",
   "add_command.displayName": "Nosaukums",
-  "add_command.displayName.help": "Norādiet komandas nosaukumu iestatījumu lapai, kas nav garāks par 64 simboliem."
+  "add_command.displayName.help": "Norādiet komandas nosaukumu iestatījumu lapai, kas nav garāks par 64 simboliem.",
+  "plugin.upload": "Balss ziņojums"
 }

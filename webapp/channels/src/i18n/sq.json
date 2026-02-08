@@ -228,5 +228,6 @@
   "user_profile.send.dm": "Dergo Mesazh",
   "web.footer.help": "Ndihmë",
   "web.header.logout": "Shkëputu",
-  "web.root.signup_info": "Të gjitha komunikimet e grupit në një vend, kërkim i menjëhershëm dhe akses kudo"
+  "web.root.signup_info": "Të gjitha komunikimet e grupit në një vend, kërkim i menjëhershëm dhe akses kudo",
+  "plugin.upload": "Mesazh zanor"
 }

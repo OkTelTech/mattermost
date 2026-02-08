@@ -14,6 +14,7 @@ import './apps_page.scss';
 
 import macosTerminal from 'images/macos-terminal.jpg';
 import macosTerminalCommands from 'images/macos-terminal-commands.png';
+import appsHero from 'images/apps-hero.png';
 
 type AppsPageProps = {
     onCustomizeHeader?: CustomizeHeaderType;
@@ -103,16 +104,25 @@ const AppsPage = ({ onCustomizeHeader }: AppsPageProps) => {
     return (
         <div className='apps-page-body'>
             <div className='apps-page-body-content'>
-                <div className='apps-page-header'>
-                    <h1 className='apps-page-title'>
-                        {formatMessage({ id: 'apps_page.title', defaultMessage: 'Download Apps' })}
-                    </h1>
-                    <p className='apps-page-subtitle'>
-                        {formatMessage({
-                            id: 'apps_page.subtitle',
-                            defaultMessage: 'Get the desktop and mobile apps for the best experience'
-                        })}
-                    </p>
+                <div className='apps-page-hero-section'>
+                    <div className='apps-page-header-column'>
+                        <h1 className='apps-page-title'>
+                            {formatMessage({ id: 'apps_page.title', defaultMessage: 'Download Apps' })}
+                        </h1>
+                        <p className='apps-page-subtitle'>
+                            {formatMessage({
+                                id: 'apps_page.subtitle',
+                                defaultMessage: 'Get the desktop and mobile apps for the best experience'
+                            })}
+                        </p>
+                    </div>
+                    <div className='apps-page-hero-image-column'>
+                        <img
+                            src={appsHero}
+                            alt='Oktel Apps'
+                            className='apps-hero-image'
+                        />
+                    </div>
                 </div>
                 <div className='apps-page-cards-grid'>
                     {appCards.map((app) => (

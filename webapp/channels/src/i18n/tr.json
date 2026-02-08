@@ -6587,5 +6587,6 @@
   "yourcomputer": "Bilgisayarınız",
   "youtube_video.play.aria_label": "YouTube üzerindeki {videoTitle} videosunu oynat",
   "youtube_video.play_button.aria_label": "Videoyu oynat",
-  "youtube_video.thumbnail.alt_text": "YouTube üzerindeki {videoTitle} küçük görseli"
+  "youtube_video.thumbnail.alt_text": "YouTube üzerindeki {videoTitle} küçük görseli",
+  "plugin.upload": "Ses mesajı"
 }

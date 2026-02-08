@@ -524,5 +524,6 @@
   "user.settings.tokens.cancel": "გაუქმება",
   "user.settings.tokens.save": "შენახვა",
   "view_image_popover.download": "ჩამოტვირთვა",
-  "yourcomputer": "თვენი კომპიუტერი"
+  "yourcomputer": "თვენი კომპიუტერი",
+  "plugin.upload": "ხმოვანი შეტყობინება"
 }

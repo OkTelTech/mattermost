@@ -4725,5 +4725,6 @@
   "widgets.users_emails_input.valid_email": "Adicionar **{email}**",
   "workspace_limits.upgrade": "Faça o upgrade para evitar os limites de dados do {planName}",
   "workspace_limits.upgrade_reasons.free": "{planName} está restrito a um histórico de mensagens de {messagesLimit} e a um armazenamento de arquivos de {storageLimit}. Você pode excluir itens para liberar espaço ou fazer upgrade para um plano pago.",
-  "yourcomputer": "Seu computador"
+  "yourcomputer": "Seu computador",
+  "plugin.upload": "Mensagem de voz"
 }

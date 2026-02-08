@@ -6749,5 +6749,6 @@
   "yourcomputer": "Twój komputer",
   "youtube_video.play.aria_label": "Odtwórz {videoTitle} na YouTube",
   "youtube_video.play_button.aria_label": "Odtwórz wideo",
-  "youtube_video.thumbnail.alt_text": "Miniatura dla{videoTitle} na YouTube"
+  "youtube_video.thumbnail.alt_text": "Miniatura dla{videoTitle} na YouTube",
+  "plugin.upload": "Wiadomość głosowa"
 }

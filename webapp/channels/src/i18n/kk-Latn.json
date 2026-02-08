@@ -262,5 +262,6 @@
   "admin.channel_settings.description": "Arna baptauların baskaru.",
   "admin.channel_settings.groupsPageTitle": "{siteName} Arnaları",
   "admin.channel_settings.title": "Arnalar",
-  "admin.cluster.ClusterName": "Cluster Atauı:"
+  "admin.cluster.ClusterName": "Cluster Atauı:",
+  "plugin.upload": "Dybystıq habarlamasy"
 }

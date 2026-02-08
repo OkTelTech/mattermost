@@ -33,9 +33,9 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return "", fmt.Errorf("get today record: %w", err)
 	}
 	if record != nil {
-		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_in", map[string]any{
 			"Username": username, "Time": record.CheckIn.Format(time.TimeOnly),
 		}))
+		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_in", map[string]any{
 	}
 
 	record = &model.AttendanceRecord{

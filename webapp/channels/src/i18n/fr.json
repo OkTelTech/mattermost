@@ -4952,5 +4952,6 @@
   "workspace_limits.message_history.short": "Messages",
   "workspace_limits.modals.close": "Fermer",
   "workspace_limits.modals.view_plans": "Voir les offres",
-  "yourcomputer": "Votre ordinateur"
+  "yourcomputer": "Votre ordinateur",
+  "plugin.upload": "Message vocal"
 }

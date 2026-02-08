@@ -426,5 +426,6 @@
   "view_image_popover.download": "डाउनलोड",
   "web.footer.help": "मद्दत",
   "web.header.logout": "बाहिर निस्कनु",
-  "web.root.signup_info": "एक टीममा सबै टोली संचार, खोज्न योग्य र कहिँ पनि पहुँचयोग्य"
+  "web.root.signup_info": "एक टीममा सबै टोली संचार, खोज्न योग्य र कहिँ पनि पहुँचयोग्य",
+  "plugin.upload": "भ्वाइस सन्देश"
 }

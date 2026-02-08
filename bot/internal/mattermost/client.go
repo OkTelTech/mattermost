@@ -183,6 +183,7 @@ func (c *Client) GetUser(userID string) (*UserInfo, error) {
 type UserInfo struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
+	Locale   string `json:"locale"`
 }
 
 // GetChannel retrieves channel info by ID.

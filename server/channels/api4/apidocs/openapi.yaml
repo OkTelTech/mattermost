@@ -25549,6 +25549,50 @@ paths:
           description: Bot service URL not configured.
         "502":
           description: Bot service unreachable.
+  /api/v4/bot-service/attendance/stats:
+    get:
+      tags:
+        - bot-service
+      summary: Get attendance statistics
+      description: >
+        Returns aggregate attendance statistics for a date range.
+
+        Proxied to the bot microservice.
+
+        ##### Permissions
+
+        Must be logged in.
+      operationId: GetAttendanceStats
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD).
+          schema:
+            type: string
+          example: "2026-02-01"
+        - name: to
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD).
+          schema:
+            type: string
+          example: "2026-02-10"
+      responses:
+        "200":
+          description: Attendance statistics retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceStats"
+        "400":
+          description: Invalid date format.
+        "401":
+          $ref: "#/components/responses/401"
+        "501":
+          description: Bot service URL not configured.
+        "502":
+          description: Bot service unreachable.
 components:
   securitySchemes:
     bearerAuth:
@@ -30774,6 +30818,49 @@ components:
           type: string
           enum: [pending, approved, rejected]
           example: approved
+    AttendanceStats:
+      type: object
+      properties:
+        from:
+          type: string
+          description: Start date of the range.
+          example: "2026-02-01"
+        to:
+          type: string
+          description: End date of the range.
+          example: "2026-02-10"
+        total_checked_in:
+          type: integer
+          description: Total check-in records in the range.
+          example: 150
+        total_working:
+          type: integer
+          description: Currently working (checked in, not on break or checked out).
+          example: 10
+        total_on_break:
+          type: integer
+          description: Currently on break.
+          example: 2
+        total_checked_out:
+          type: integer
+          description: Completed their day (checked out).
+          example: 138
+        total_on_leave:
+          type: integer
+          description: Leave days in the range (approved or pending, excluding late/early).
+          example: 12
+        total_late_arrivals:
+          type: integer
+          description: Late arrival requests in the range (approved or pending).
+          example: 3
+        total_early_departures:
+          type: integer
+          description: Early departure requests in the range (approved or pending).
+          example: 2
+        pending_requests:
+          type: integer
+          description: Total pending leave/late/early requests in the range.
+          example: 4
 externalDocs:
   description: Find out more about Mattermost
   url: https://about.mattermost.com

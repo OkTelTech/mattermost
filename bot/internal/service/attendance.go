@@ -490,6 +490,81 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID stri
 	return &AttendanceReport{From: from, To: to, Users: users}, nil
 }
 
+// AttendanceStats contains aggregate counts for a date range.
+type AttendanceStats struct {
+	From             string `json:"from"`
+	To               string `json:"to"`
+	TotalCheckedIn   int    `json:"total_checked_in"`
+	TotalWorking     int    `json:"total_working"`
+	TotalOnBreak     int    `json:"total_on_break"`
+	TotalCheckedOut  int    `json:"total_checked_out"`
+	TotalOnLeave     int    `json:"total_on_leave"`
+	TotalLateArrival int    `json:"total_late_arrivals"`
+	TotalEarlyDepart int    `json:"total_early_departures"`
+	PendingRequests  int    `json:"pending_requests"`
+}
+
+// GetAttendanceStats returns aggregate attendance counts for a date range.
+func (s *AttendanceService) GetStats(ctx context.Context, from, to string) (*AttendanceStats, error) {
+	if _, err := time.Parse(time.DateOnly, from); err != nil {
+		return nil, fmt.Errorf("invalid 'from' date, use YYYY-MM-DD: %w", err)
+	}
+	if _, err := time.Parse(time.DateOnly, to); err != nil {
+		return nil, fmt.Errorf("invalid 'to' date, use YYYY-MM-DD: %w", err)
+	}
+	if from > to {
+		return nil, fmt.Errorf("'from' must be before or equal to 'to'")
+	}
+
+	records, err := s.store.GetAttendanceByDateRange(ctx, from, to, "")
+	if err != nil {
+		return nil, fmt.Errorf("get attendance: %w", err)
+	}
+
+	leaves, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, "")
+	if err != nil {
+		return nil, fmt.Errorf("get leave requests: %w", err)
+	}
+
+	stats := &AttendanceStats{From: from, To: to}
+
+	for _, rec := range records {
+		stats.TotalCheckedIn++
+		switch rec.Status {
+		case model.AttendanceStatusWorking:
+			stats.TotalWorking++
+		case model.AttendanceStatusBreak:
+			stats.TotalOnBreak++
+		case model.AttendanceStatusCompleted:
+			stats.TotalCheckedOut++
+		}
+	}
+
+	for _, req := range leaves {
+		if req.Status == model.LeaveStatusRejected {
+			continue
+		}
+		if req.Status == model.LeaveStatusPending {
+			stats.PendingRequests++
+		}
+		switch req.Type {
+		case model.LeaveTypeLateArrival:
+			stats.TotalLateArrival++
+		case model.LeaveTypeEarlyDeparture:
+			stats.TotalEarlyDepart++
+		default:
+			// Count only leave days within the range
+			for _, d := range req.Dates {
+				if d >= from && d <= to {
+					stats.TotalOnLeave++
+				}
+			}
+		}
+	}
+
+	return stats, nil
+}
+
 func validateDateList(dates []string) error {
 	if len(dates) == 0 {
 		return fmt.Errorf("at least one date is required")

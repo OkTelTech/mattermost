@@ -38,9 +38,16 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_in", map[string]any{
 	}
 
+	// Get channel info to retrieve TeamID
+	channelInfo, err := s.mm.GetChannel(channelID)
+	if err != nil {
+		return "", fmt.Errorf("get channel info: %w", err)
+	}
+
 	record = &model.AttendanceRecord{
 		UserID:    userID,
 		Username:  username,
+		TeamID:    channelInfo.TeamID,
 		ChannelID: channelID,
 		Date:      date,
 		CheckIn:   &now,
@@ -204,6 +211,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 	req := &model.LeaveRequest{
 		UserID:            userID,
 		Username:          username,
+		TeamID:            channelInfo.TeamID,
 		ChannelID:         channelID,
 		ApprovalChannelID: approvalChannelID,
 		Type:              leaveType,

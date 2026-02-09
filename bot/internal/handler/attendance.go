@@ -592,6 +592,26 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
+// HandleReport returns attendance statistics filtered by date range and optionally by user.
+// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), user_id (optional).
+func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	from := q.Get("from")
+	to := q.Get("to")
+	if from == "" || to == "" {
+		http.Error(w, "query params 'from' and 'to' are required (YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+
+	report, err := h.svc.GetReport(r.Context(), from, to, q.Get("user_id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, report)
+}
+
 // RegisterRoutes registers all attendance routes on the given mux.
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
@@ -609,6 +629,7 @@ func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance/approve", h.HandleApprove)
 	mux.HandleFunc("POST /api/attendance/reject", h.HandleReject)
 	mux.HandleFunc("POST /api/attendance/reject-submit", h.HandleRejectSubmit)
+	mux.HandleFunc("GET /api/attendance/report", h.HandleReport)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

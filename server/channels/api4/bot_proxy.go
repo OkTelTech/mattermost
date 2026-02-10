@@ -6,6 +6,7 @@ package api4
 import (
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/mattermost/mattermost/server/public/model"
@@ -18,7 +19,7 @@ func (api *API) InitBotProxy() {
 }
 
 func proxyBotAttendanceReport(c *Context, w http.ResponseWriter, r *http.Request) {
-	botServiceURL := *c.App.Config().ServiceSettings.BotServiceURL
+	botServiceURL := os.Getenv("BOT_API_URL")
 	if botServiceURL == "" {
 		c.Err = model.NewAppError("proxyBotAttendanceReport", "api.bot_proxy.bot_service_url_not_configured.app_error", nil, "", http.StatusNotImplemented)
 		return
@@ -55,7 +56,7 @@ func proxyBotAttendanceReport(c *Context, w http.ResponseWriter, r *http.Request
 }
 
 func proxyBotAttendanceStats(c *Context, w http.ResponseWriter, r *http.Request) {
-	botServiceURL := *c.App.Config().ServiceSettings.BotServiceURL
+	botServiceURL := os.Getenv("BOT_API_URL")
 	if botServiceURL == "" {
 		c.Err = model.NewAppError("proxyBotAttendanceStats", "api.bot_proxy.bot_service_url_not_configured.app_error", nil, "", http.StatusNotImplemented)
 		return

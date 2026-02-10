@@ -426,7 +426,6 @@ type ServiceSettings struct {
 	EnableEmailInvitations                            *bool `access:"authentication_signup"`
 	DisableBotsWhenOwnerIsDeactivated                 *bool `access:"integrations_bot_accounts"`
 	EnableBotAccountCreation                          *bool   `access:"integrations_bot_accounts"`
-	BotServiceURL                                     *string `access:"integrations_bot_accounts"`
 	EnableSVGs                                        *bool   `access:"site_posts"`
 	EnableLatex                                       *bool `access:"site_posts"`
 	EnableInlineLatex                                 *bool `access:"site_posts"`
@@ -879,10 +878,6 @@ func (s *ServiceSettings) SetDefaults(isUpdate bool) {
 
 	if s.EnableBotAccountCreation == nil {
 		s.EnableBotAccountCreation = NewPointer(false)
-	}
-
-	if s.BotServiceURL == nil {
-		s.BotServiceURL = NewPointer("")
 	}
 
 	if s.EnableDesktopLandingPage == nil {

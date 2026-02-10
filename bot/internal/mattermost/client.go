@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -25,11 +26,12 @@ func NewClient(baseURL, botToken string) *Client {
 
 // Post represents a Mattermost post.
 type Post struct {
-	ID        string `json:"id,omitempty"`
-	ChannelID string `json:"channel_id"`
-	RootID    string `json:"root_id,omitempty"`
-	Message   string `json:"message"`
-	Props     Props  `json:"props,omitempty"`
+	ID        string   `json:"id,omitempty"`
+	ChannelID string   `json:"channel_id"`
+	RootID    string   `json:"root_id,omitempty"`
+	Message   string   `json:"message"`
+	Props     Props    `json:"props,omitempty"`
+	FileIds   []string `json:"file_ids,omitempty"`
 }
 
 // Props holds post properties including attachments.
@@ -199,6 +201,68 @@ type ChannelInfo struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	TeamID string `json:"team_id"`
+}
+
+// FileInfo represents uploaded file metadata.
+type FileInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Size      int64  `json:"size"`
+	MimeType  string `json:"mime_type"`
+	Extension string `json:"extension"`
+}
+
+// FileUploadResponse is returned by the file upload API.
+type FileUploadResponse struct {
+	FileInfos []FileInfo `json:"file_infos"`
+}
+
+// UploadFile uploads a file to Mattermost and returns the file info.
+func (c *Client) UploadFile(channelID, filename string, fileData io.Reader) (*FileInfo, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	if err := writer.WriteField("channel_id", channelID); err != nil {
+		return nil, fmt.Errorf("write channel_id field: %w", err)
+	}
+
+	part, err := writer.CreateFormFile("files", filename)
+	if err != nil {
+		return nil, fmt.Errorf("create form file: %w", err)
+	}
+	if _, err := io.Copy(part, fileData); err != nil {
+		return nil, fmt.Errorf("copy file data: %w", err)
+	}
+	writer.Close()
+
+	req, err := http.NewRequest("POST", c.baseURL+"/api/v4/files", body)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.botToken)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result FileUploadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	if len(result.FileInfos) == 0 {
+		return nil, fmt.Errorf("no file info returned")
+	}
+
+	return &result.FileInfos[0], nil
 }
 
 func (c *Client) doJSON(method, path string, body any, result any) error {

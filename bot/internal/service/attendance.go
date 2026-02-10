@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -163,6 +164,45 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	msg := fmt.Sprintf("@%s checked out", username)
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
+}
+
+// AttachCheckInImage uploads an image and attaches it to the user's check-in post.
+func (s *AttendanceService) AttachCheckInImage(ctx context.Context, userID, username, filename string, fileData io.Reader) (string, error) {
+	now := time.Now()
+	date := now.Format(time.DateOnly)
+
+	record, err := s.store.GetTodayRecord(ctx, userID, date)
+	if err != nil {
+		return "", fmt.Errorf("get today record: %w", err)
+	}
+	if record == nil {
+		return "", fmt.Errorf("@%s has not checked in today - please check in first", username)
+	}
+	if record.CheckInImageID != "" {
+		return "", fmt.Errorf("@%s has already attached an image to today's check-in", username)
+	}
+
+	fileInfo, err := s.mm.UploadFile(record.ChannelID, filename, fileData)
+	if err != nil {
+		return "", fmt.Errorf("upload file: %w", err)
+	}
+
+	msg := fmt.Sprintf("@%s checked in", username)
+	_, err = s.mm.UpdatePost(record.PostID, &mattermost.Post{
+		ChannelID: record.ChannelID,
+		Message:   msg,
+		FileIds:   []string{fileInfo.ID},
+	})
+	if err != nil {
+		return "", fmt.Errorf("update post with image: %w", err)
+	}
+
+	record.CheckInImageID = fileInfo.ID
+	if err := s.store.UpdateRecord(ctx, record); err != nil {
+		return "", fmt.Errorf("update record: %w", err)
+	}
+
+	return "Image attached to your check-in!", nil
 }
 
 func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr string) error {

@@ -11,6 +11,8 @@ import (
 	"oktel-bot/internal/service"
 )
 
+const maxImageSize = 10 << 20 // 10MB
+
 type AttendanceHandler struct {
 	svc    *service.AttendanceService
 	mm     *mattermost.Client
@@ -151,7 +153,87 @@ func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{EphemeralText: msg})
+
+	writeJSON(w, SlashResponse{
+		ResponseType: "ephemeral",
+		Text:         msg,
+		Attachments: []mattermost.Attachment{
+			{
+				Text: "Want to add a photo to your check-in?",
+				Actions: []mattermost.Action{
+					{
+						Name: "Add Photo",
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     h.botURL + "/api/attendance/checkin-image-info",
+							Context: map[string]any{"action": "checkin-image"},
+						},
+					},
+				},
+			},
+		},
+	})
+}
+
+// HandleCheckInImageInfo returns upload instructions to the user.
+func (h *AttendanceHandler) HandleCheckInImageInfo(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	uploadURL := h.botURL + "/api/attendance/checkin-image?user_id=" + req.UserID
+
+	writeJSON(w, ActionResponse{
+		EphemeralText: "To attach a photo to your check-in, upload an image:\n\n" +
+			"**Option 1:** Use curl:\n```\ncurl -X POST '" + uploadURL + "' -F 'file=@your-image.jpg'\n```\n\n" +
+			"**Option 2:** Open in browser: " + uploadURL,
+	})
+}
+
+// HandleCheckInImageUpload handles direct image upload for check-in.
+func (h *AttendanceHandler) HandleCheckInImageUpload(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(maxImageSize); err != nil {
+		http.Error(w, "file too large or invalid form (max 10MB)", http.StatusBadRequest)
+		return
+	}
+
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		userID = r.FormValue("user_id")
+	}
+	if userID == "" {
+		http.Error(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "file is required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		http.Error(w, "only image files are allowed", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.mm.GetUser(userID)
+	if err != nil {
+		http.Error(w, "invalid user", http.StatusBadRequest)
+		return
+	}
+
+	msg, err := h.svc.AttachCheckInImage(r.Context(), userID, user.Username, header.Filename, file)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, map[string]string{"message": msg})
 }
 
 // HandleBreakStart opens a dialog asking for break reason.
@@ -596,6 +678,8 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
 	mux.HandleFunc("POST /api/attendance/checkin", h.HandleCheckIn)
+	mux.HandleFunc("POST /api/attendance/checkin-image-info", h.HandleCheckInImageInfo)
+	mux.HandleFunc("POST /api/attendance/checkin-image", h.HandleCheckInImageUpload)
 	mux.HandleFunc("POST /api/attendance/break-start", h.HandleBreakStart)
 	mux.HandleFunc("POST /api/attendance/break", h.HandleBreakSubmit)
 	mux.HandleFunc("POST /api/attendance/break-end", h.HandleBreakEnd)

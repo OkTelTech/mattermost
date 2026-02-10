@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -25,22 +24,28 @@ func NewAttendanceService(store *store.AttendanceStore, mm *mattermost.Client, b
 	return &AttendanceService{store: store, mm: mm, botURL: botURL}
 }
 
-func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID string) (string, error) {
+// CheckInResult holds the result of a check-in operation.
+type CheckInResult struct {
+	Message string
+	PostID  string
+}
+
+func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID string) (*CheckInResult, error) {
 	now := time.Now()
 	date := now.Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
-		return "", fmt.Errorf("get today record: %w", err)
+		return nil, fmt.Errorf("get today record: %w", err)
 	}
 	if record != nil {
-		return "", fmt.Errorf("@%s already checked in today", username)
+		return nil, fmt.Errorf("@%s already checked in today", username)
 	}
 
 	// Get channel info to retrieve TeamID
 	channelInfo, err := s.mm.GetChannel(channelID)
 	if err != nil {
-		return "", fmt.Errorf("get channel info: %w", err)
+		return nil, fmt.Errorf("get channel info: %w", err)
 	}
 
 	record = &model.AttendanceRecord{
@@ -53,21 +58,21 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		Status:    model.AttendanceStatusWorking,
 	}
 	if err := s.store.CreateRecord(ctx, record); err != nil {
-		return "", fmt.Errorf("create record: %w", err)
+		return nil, fmt.Errorf("create record: %w", err)
 	}
 
 	msg := fmt.Sprintf("@%s checked in", username)
 	post, err := s.mm.CreatePost(&mattermost.Post{ChannelID: channelID, Message: msg})
 	if err != nil {
-		return "", fmt.Errorf("create post: %w", err)
+		return nil, fmt.Errorf("create post: %w", err)
 	}
 
 	record.PostID = post.ID
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
-		return "", fmt.Errorf("update record: %w", err)
+		return nil, fmt.Errorf("update record: %w", err)
 	}
 
-	return msg, nil
+	return &CheckInResult{Message: msg, PostID: post.ID}, nil
 }
 
 func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, reason string) (string, error) {
@@ -166,8 +171,8 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	return msg, nil
 }
 
-// AttachCheckInImage uploads an image and attaches it to the user's check-in post.
-func (s *AttendanceService) AttachCheckInImage(ctx context.Context, userID, username, filename string, fileData io.Reader) (string, error) {
+// AttachCheckInImage attaches an already-uploaded file to the user's check-in post.
+func (s *AttendanceService) AttachCheckInImage(ctx context.Context, userID, username, fileID string) (string, error) {
 	now := time.Now()
 	date := now.Format(time.DateOnly)
 
@@ -182,22 +187,17 @@ func (s *AttendanceService) AttachCheckInImage(ctx context.Context, userID, user
 		return "", fmt.Errorf("@%s has already attached an image to today's check-in", username)
 	}
 
-	fileInfo, err := s.mm.UploadFile(record.ChannelID, filename, fileData)
-	if err != nil {
-		return "", fmt.Errorf("upload file: %w", err)
-	}
-
 	msg := fmt.Sprintf("@%s checked in", username)
 	_, err = s.mm.UpdatePost(record.PostID, &mattermost.Post{
 		ChannelID: record.ChannelID,
 		Message:   msg,
-		FileIds:   []string{fileInfo.ID},
+		FileIds:   []string{fileID},
 	})
 	if err != nil {
 		return "", fmt.Errorf("update post with image: %w", err)
 	}
 
-	record.CheckInImageID = fileInfo.ID
+	record.CheckInImageID = fileID
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", fmt.Errorf("update record: %w", err)
 	}

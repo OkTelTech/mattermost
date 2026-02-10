@@ -27,6 +27,7 @@ func NewClient(baseURL, botToken string) *Client {
 // Post represents a Mattermost post.
 type Post struct {
 	ID        string   `json:"id,omitempty"`
+	UserID    string   `json:"user_id,omitempty"`
 	ChannelID string   `json:"channel_id"`
 	RootID    string   `json:"root_id,omitempty"`
 	Message   string   `json:"message"`
@@ -263,6 +264,30 @@ func (c *Client) UploadFile(channelID, filename string, fileData io.Reader) (*Fi
 	}
 
 	return &result.FileInfos[0], nil
+}
+
+// ThreadResponse is the response from the get post thread API.
+type ThreadResponse struct {
+	Order []string         `json:"order"`
+	Posts map[string]*Post `json:"posts"`
+}
+
+// GetPostThread returns all posts in a thread.
+func (c *Client) GetPostThread(postID string) (*ThreadResponse, error) {
+	var result ThreadResponse
+	if err := c.doJSON("GET", "/api/v4/posts/"+postID+"/thread", nil, &result); err != nil {
+		return nil, fmt.Errorf("get post thread: %w", err)
+	}
+	return &result, nil
+}
+
+// CreateEphemeralPost sends an ephemeral post visible only to the specified user.
+func (c *Client) CreateEphemeralPost(userID string, post *Post) error {
+	payload := map[string]any{
+		"user_id":   userID,
+		"post":      post,
+	}
+	return c.doJSON("POST", "/api/v4/posts/ephemeral", payload, nil)
 }
 
 func (c *Client) doJSON(method, path string, body any, result any) error {

@@ -19,7 +19,7 @@ func (api *API) InitBotProxy() {
 }
 
 func proxyBotAttendanceReport(c *Context, w http.ResponseWriter, r *http.Request) {
-	botServiceURL := os.Getenv("BOT_API_URL")
+	botServiceURL := os.Getenv("BOT_URL")
 	if botServiceURL == "" {
 		c.Err = model.NewAppError("proxyBotAttendanceReport", "api.bot_proxy.bot_service_url_not_configured.app_error", nil, "", http.StatusNotImplemented)
 		return
@@ -56,7 +56,7 @@ func proxyBotAttendanceReport(c *Context, w http.ResponseWriter, r *http.Request
 }
 
 func proxyBotAttendanceStats(c *Context, w http.ResponseWriter, r *http.Request) {
-	botServiceURL := os.Getenv("BOT_API_URL")
+	botServiceURL := os.Getenv("BOT_URL")
 	if botServiceURL == "" {
 		c.Err = model.NewAppError("proxyBotAttendanceStats", "api.bot_proxy.bot_service_url_not_configured.app_error", nil, "", http.StatusNotImplemented)
 		return

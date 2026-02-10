@@ -97,12 +97,19 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, na
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetStatus(ctx, req, i18n.T(ctx, "budget.status.step1"))
 
 	// Post info to budget-sale (no buttons)
 	salePost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: channels.Sale,
-		Message:   "@all\n" + infoMsg,
+		Message:   "@all",
+		Props: mattermost.Props{
+			MessageKey: "budget.msg.request_created",
+			MessageData: map[string]any{
+				"Name":    name,
+				"Partner": partner,
+				"Amount":  amount,
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("post to sale channel: %w", err)
@@ -111,8 +118,14 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, na
 	// Post to budget-partner-{partner} with content button
 	partnerPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: channels.Partner,
-		Message:   "@all\n" + infoMsg,
+		Message:   "@all",
 		Props: mattermost.Props{
+			MessageKey: "budget.msg.partner_fill_content",
+			MessageData: map[string]any{
+				"Name":    name,
+				"Partner": partner,
+				"Amount":  amount,
+			},
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
@@ -205,7 +218,13 @@ func (s *BudgetService) SubmitContent(ctx context.Context, requestID, userID, po
 		s.mm.CreatePost(&mattermost.Post{
 			ChannelID: req.TLQCChannelID,
 			RootID:    req.TLQCPostID,
-			Message:   tlqcMention + " " + i18n.T(ctx, "budget.msg.partner_resubmit"),
+			Message:   tlqcMention,
+			Props: mattermost.Props{
+				MessageKey: "budget.msg.partner_resubmit",
+				MessageData: map[string]any{
+					"Username": s.extractUsername(tlqcMention),
+				},
+			},
 		})
 	} else {
 		// First submit: create new TLQC post
@@ -282,7 +301,13 @@ func (s *BudgetService) ConfirmTLQC(ctx context.Context, requestID, userID strin
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.PartnerChannelID,
 		RootID:    req.PartnerPostID,
-		Message:   partnerMention + " " + i18n.T(ctx, "budget.msg.fill_payment"),
+		Message:   partnerMention,
+		Props: mattermost.Props{
+			MessageKey: "budget.msg.fill_payment",
+			MessageData: map[string]any{
+				"Username": s.extractUsername(partnerMention),
+			},
+		},
 	})
 
 	// Update sale post status
@@ -352,7 +377,14 @@ func (s *BudgetService) ReturnToPartner(ctx context.Context, requestID, userID, 
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.PartnerChannelID,
 		RootID:    req.PartnerPostID,
-		Message:   partnerMention + " " + i18n.T(ctx, "budget.msg.content_returned", map[string]any{"Reason": reason}),
+		Message:   partnerMention,
+		Props: mattermost.Props{
+			MessageKey: "budget.msg.content_returned",
+			MessageData: map[string]any{
+				"Username": s.extractUsername(partnerMention),
+				"Reason":   reason,
+			},
+		},
 	})
 
 	// Update sale post status
@@ -403,8 +435,14 @@ func (s *BudgetService) SubmitPayment(ctx context.Context, requestID, recipientN
 	// Create post in budget-approval with approve + reject buttons
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
-		Message:   "@all\n" + infoMsg + paymentDetail,
+		Message:   "@all",
 		Props: mattermost.Props{
+			MessageKey: "budget.msg.approval_review",
+			MessageData: map[string]any{
+				"Name":    req.Name,
+				"Partner": req.Partner,
+				"Amount":  req.Amount,
+			},
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
@@ -472,8 +510,14 @@ func (s *BudgetService) Approve(ctx context.Context, requestID, userID string) e
 	// Create post in budget-finance with complete button
 	financePost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.FinanceChannelID,
-		Message:   "@all\n" + infoMsg,
+		Message:   "@all",
 		Props: mattermost.Props{
+			MessageKey: "budget.msg.finance_complete",
+			MessageData: map[string]any{
+				"Name":    req.Name,
+				"Partner": req.Partner,
+				"Amount":  req.Amount,
+			},
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
@@ -643,4 +687,12 @@ func (s *BudgetService) userMention(userID string) string {
 		return "@all"
 	}
 	return "@" + user.Username
+}
+
+// extractUsername removes the "@" prefix from a mention string
+func (s *BudgetService) extractUsername(mention string) string {
+	if len(mention) > 0 && mention[0] == '@' {
+		return mention[1:]
+	}
+	return mention
 }

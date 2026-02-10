@@ -57,10 +57,17 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return "", fmt.Errorf("create record: %w", err)
 	}
 
-	msg := i18n.T(ctx, "attendance.msg.checked_in", map[string]any{
-		"Username": username, "Time": now.Format(time.TimeOnly),
+	post, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: channelID,
+		Message:   "@" + username,
+		Props: mattermost.Props{
+			MessageKey: "attendance.msg.checked_in",
+			MessageData: map[string]any{
+				"Username": username,
+				"Time":     now.Unix(),
+			},
+		},
 	})
-	post, err := s.mm.CreatePost(&mattermost.Post{ChannelID: channelID, Message: msg})
 	if err != nil {
 		return "", fmt.Errorf("create post: %w", err)
 	}
@@ -70,7 +77,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return "", fmt.Errorf("update record: %w", err)
 	}
 
-	return msg, nil
+	return fmt.Sprintf("%s checked in at %s", username, now.Format(time.TimeOnly)), nil
 }
 
 func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, reason string) (string, error) {
@@ -102,11 +109,20 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 		return "", err
 	}
 
-	msg := i18n.T(ctx, "attendance.msg.break_start", map[string]any{
-		"Username": username, "Time": now.Format(time.TimeOnly), "Reason": reason,
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: record.ChannelID,
+		RootID:    record.PostID,
+		Message:   "@" + username,
+		Props: mattermost.Props{
+			MessageKey: "attendance.msg.break_start",
+			MessageData: map[string]any{
+				"Username": username,
+				"Time":     now.Unix(),
+				"Reason":   reason,
+			},
+		},
 	})
-	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
-	return msg, nil
+	return fmt.Sprintf("%s started break at %s", username, now.Format(time.TimeOnly)), nil
 }
 
 func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username string) (string, error) {
@@ -132,11 +148,19 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 		return "", err
 	}
 
-	msg := i18n.T(ctx, "attendance.msg.break_end", map[string]any{
-		"Username": username, "Time": now.Format(time.TimeOnly),
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: record.ChannelID,
+		RootID:    record.PostID,
+		Message:   "@" + username,
+		Props: mattermost.Props{
+			MessageKey: "attendance.msg.break_end",
+			MessageData: map[string]any{
+				"Username": username,
+				"Time":     now.Unix(),
+			},
+		},
 	})
-	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
-	return msg, nil
+	return fmt.Sprintf("%s ended break at %s", username, now.Format(time.TimeOnly)), nil
 }
 
 func (s *AttendanceService) CheckOut(ctx context.Context, userID, username string) (string, error) {
@@ -172,11 +196,19 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		totalBreak += end.Sub(b.Start)
 	}
 
-	msg := i18n.T(ctx, "attendance.msg.checked_out", map[string]any{
-		"Username": username, "Time": now.Format(time.TimeOnly),
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: record.ChannelID,
+		RootID:    record.PostID,
+		Message:   "@" + username,
+		Props: mattermost.Props{
+			MessageKey: "attendance.msg.checked_out",
+			MessageData: map[string]any{
+				"Username": username,
+				"Time":     now.Unix(),
+			},
+		},
 	})
-	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
-	return msg, nil
+	return fmt.Sprintf("%s checked out at %s", username, now.Format(time.TimeOnly)), nil
 }
 
 func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr string) error {
@@ -225,12 +257,22 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatLeaveMsg(ctx, username, leaveType, dates, reason, timeStr, i18n.T(ctx, "leave.status.pending"), "")
 
 	// Post info message to main channel (no buttons)
 	infoPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: channelID,
-		Message:   infoMsg,
+		Message:   "@" + username,
+		Props: mattermost.Props{
+			MessageKey: "leave.msg.request_info",
+			MessageData: map[string]any{
+				"Username":     username,
+				"LeaveType":    leaveTypeLabel(ctx, leaveType),
+				"Dates":        strings.Join(dates, ", "),
+				"Reason":       reason,
+				"ExpectedTime": timeStr,
+				"Status":       i18n.T(ctx, "leave.status.pending"),
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("post info message: %w", err)
@@ -239,8 +281,17 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 	// Post approval message to approval channel (with buttons)
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: approvalChannelID,
-		Message:   "@all\n" + infoMsg,
+		Message:   "@all",
 		Props: mattermost.Props{
+			MessageKey: "leave.msg.request_approval",
+			MessageData: map[string]any{
+				"Username":     username,
+				"LeaveType":    leaveTypeLabel(ctx, leaveType),
+				"Dates":        strings.Join(dates, ", "),
+				"Reason":       reason,
+				"ExpectedTime": timeStr,
+				"Status":       i18n.T(ctx, "leave.status.pending"),
+			},
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
@@ -320,9 +371,14 @@ func (s *AttendanceService) ApproveLeave(ctx context.Context, requestID, approve
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.ChannelID,
 		RootID:    req.PostID,
-		Message: i18n.T(ctx, "attendance.msg.approved", map[string]any{
-			"Username": req.Username, "Approver": approverUsername,
-		}),
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey: "attendance.msg.approved",
+			MessageData: map[string]any{
+				"Username": req.Username,
+				"Approver": approverUsername,
+			},
+		},
 	})
 
 	return updatedMsg, nil
@@ -376,16 +432,21 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 	})
 
 	// Reply in thread to notify requester
-	replyMsg := i18n.T(ctx, "attendance.msg.rejected", map[string]any{
-		"Username": req.Username, "Approver": rejecterUsername,
-	})
+	rejectData := map[string]any{
+		"Username": req.Username,
+		"Approver": rejecterUsername,
+	}
 	if reason != "" {
-		replyMsg += i18n.T(ctx, "attendance.msg.reject_reason", map[string]any{"Reason": reason})
+		rejectData["Reason"] = reason
 	}
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.ChannelID,
 		RootID:    req.PostID,
-		Message:   replyMsg,
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey:  "attendance.msg.rejected",
+			MessageData: rejectData,
+		},
 	})
 
 	return updatedMsg, nil

@@ -138,7 +138,7 @@ func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Re
 	})
 }
 
-// HandleCheckIn handles the check-in button click.
+// HandleCheckIn opens the check-in dialog with optional photo upload.
 func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request) {
 	var req ActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -146,106 +146,63 @@ func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := h.svc.CheckIn(r.Context(), req.UserID, req.UserName, req.ChannelID)
-	if err != nil {
-		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
-		return
-	}
-
-	// Reply in thread with instructions and "Attach Photo" button
-	if _, err := h.mm.CreatePost(&mattermost.Post{
-		ChannelID: req.ChannelID,
-		RootID:    result.PostID,
-		Message:   "Reply with a photo in this thread, then click **Attach Photo**.",
-		Props: mattermost.Props{
-			Attachments: []mattermost.Attachment{
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/checkin-submit",
+		Dialog: mattermost.Dialog{
+			Title:       "Check In",
+			SubmitLabel: "Check In",
+			Elements: []mattermost.DialogElement{
 				{
-					Actions: []mattermost.Action{
-						{
-							Name: "Attach Photo",
-							Type: "button",
-							Integration: mattermost.Integration{
-								URL:     h.botURL + "/api/attendance/checkin-image-attach",
-								Context: map[string]any{"action": "checkin-image-attach"},
-							},
-						},
-					},
+					DisplayName: "Photo",
+					Name:        "photo",
+					Type:        "file",
+					Optional:    true,
+					HelpText:    "Attach a photo to your check-in (optional)",
+					Accept:      "image/*",
 				},
 			},
 		},
-	}); err != nil {
-		log.Printf("ERROR creating attach-photo reply: %v", err)
+	})
+	if err != nil {
+		log.Printf("ERROR open check-in dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: "Failed to open check-in form. Please try again."})
+		return
 	}
-
-	writeJSON(w, ActionResponse{EphemeralText: result.Message})
+	writeJSON(w, ActionResponse{})
 }
 
-// HandleCheckInImageAttach reads the check-in thread, finds the user's uploaded image, and attaches it.
-func (h *AttendanceHandler) HandleCheckInImageAttach(w http.ResponseWriter, r *http.Request) {
-	var req ActionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// HandleCheckInSubmit processes the check-in dialog submission.
+func (h *AttendanceHandler) HandleCheckInSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-
-	// The button post is a reply in the check-in thread; its root_id is the check-in post.
-	// We need the check-in post ID to read the thread. Get it from the button post.
-	rootPostID := req.PostID
-	if rootPostID == "" {
-		writeJSON(w, ActionResponse{EphemeralText: "Could not determine check-in post."})
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	// Get the root post ID (the button post itself might be a reply)
-	thread, err := h.mm.GetPostThread(rootPostID)
-	if err != nil {
-		log.Printf("ERROR get post thread: %v", err)
-		writeJSON(w, ActionResponse{EphemeralText: "Failed to read thread. Please try again."})
-		return
-	}
-
-	// Determine the root post ID from the button post
-	checkinPostID := rootPostID
-	if buttonPost, ok := thread.Posts[rootPostID]; ok && buttonPost.RootID != "" {
-		checkinPostID = buttonPost.RootID
-		// Re-fetch thread from the actual root if needed
-		if _, ok := thread.Posts[checkinPostID]; !ok {
-			thread, err = h.mm.GetPostThread(checkinPostID)
-			if err != nil {
-				log.Printf("ERROR get root thread: %v", err)
-				writeJSON(w, ActionResponse{EphemeralText: "Failed to read thread."})
-				return
-			}
+	username := sub.UserName
+	if username == "" {
+		user, err := h.mm.GetUser(sub.UserID)
+		if err == nil {
+			username = user.Username
 		}
 	}
 
-	// Find the most recent post from the user that has file attachments
-	var fileID string
-	for _, postID := range thread.Order {
-		p := thread.Posts[postID]
-		if p == nil || p.UserID != req.UserID || len(p.FileIds) == 0 {
-			continue
-		}
-		// Take the last match (most recent) since order is chronological
-		fileID = p.FileIds[0]
-	}
+	fileID := sub.Submission["photo"]
 
-	if fileID == "" {
-		writeJSON(w, ActionResponse{EphemeralText: "No image found. Please upload a photo as a reply in this thread first, then click Attach Photo again."})
-		return
-	}
-
-	msg, err := h.svc.AttachCheckInImage(r.Context(), req.UserID, req.UserName, fileID)
+	result, err := h.svc.CheckIn(r.Context(), sub.UserID, username, sub.ChannelID, fileID)
 	if err != nil {
-		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		log.Printf("ERROR check-in: %v", err)
+		writeJSON(w, map[string]string{"error": err.Error()})
 		return
 	}
+	_ = result
 
-	// Remove the Attach Photo button
-	writeJSON(w, ActionResponse{
-		Update:        &ActionUpdate{Message: msg, Props: &mattermost.Props{Attachments: []mattermost.Attachment{}}},
-		EphemeralText: msg,
-	})
+	w.WriteHeader(http.StatusOK)
 }
 
 // HandleBreakStart opens a dialog asking for break reason.
@@ -690,7 +647,7 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
 	mux.HandleFunc("POST /api/attendance/checkin", h.HandleCheckIn)
-	mux.HandleFunc("POST /api/attendance/checkin-image-attach", h.HandleCheckInImageAttach)
+	mux.HandleFunc("POST /api/attendance/checkin-submit", h.HandleCheckInSubmit)
 	mux.HandleFunc("POST /api/attendance/break-start", h.HandleBreakStart)
 	mux.HandleFunc("POST /api/attendance/break", h.HandleBreakSubmit)
 	mux.HandleFunc("POST /api/attendance/break-end", h.HandleBreakEnd)

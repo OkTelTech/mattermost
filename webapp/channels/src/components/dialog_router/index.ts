@@ -38,6 +38,7 @@ function mapStateToProps(state: GlobalState) {
         notifyOnCancel: data.dialog.notify_on_cancel,
         state: data.dialog.state,
         sourceUrl: data.dialog.source_url,
+        channelId: state.entities.channels.currentChannelId,
         emojiMap,
         isAppsFormEnabled,
         hasUrl: Boolean(data.url),

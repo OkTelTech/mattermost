@@ -30,7 +30,7 @@ type CheckInResult struct {
 	PostID  string
 }
 
-func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID string) (*CheckInResult, error) {
+func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID string) (*CheckInResult, error) {
 	now := time.Now()
 	date := now.Format(time.DateOnly)
 
@@ -62,7 +62,14 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 	}
 
 	msg := fmt.Sprintf("@%s checked in", username)
-	post, err := s.mm.CreatePost(&mattermost.Post{ChannelID: channelID, Message: msg})
+	if fileID != "" {
+		// Embed the user-uploaded image via markdown (no re-upload needed)
+		msg += fmt.Sprintf("\n\n![check-in photo](/api/v4/files/%s/preview)", fileID)
+		record.CheckInImageID = fileID
+	}
+	postReq := &mattermost.Post{ChannelID: channelID, Message: msg}
+
+	post, err := s.mm.CreatePost(postReq)
 	if err != nil {
 		return nil, fmt.Errorf("create post: %w", err)
 	}
@@ -169,40 +176,6 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	msg := fmt.Sprintf("@%s checked out", username)
 	s.mm.CreatePost(&mattermost.Post{ChannelID: record.ChannelID, RootID: record.PostID, Message: msg})
 	return msg, nil
-}
-
-// AttachCheckInImage attaches an already-uploaded file to the user's check-in post.
-func (s *AttendanceService) AttachCheckInImage(ctx context.Context, userID, username, fileID string) (string, error) {
-	now := time.Now()
-	date := now.Format(time.DateOnly)
-
-	record, err := s.store.GetTodayRecord(ctx, userID, date)
-	if err != nil {
-		return "", fmt.Errorf("get today record: %w", err)
-	}
-	if record == nil {
-		return "", fmt.Errorf("@%s has not checked in today - please check in first", username)
-	}
-	if record.CheckInImageID != "" {
-		return "", fmt.Errorf("@%s has already attached an image to today's check-in", username)
-	}
-
-	msg := fmt.Sprintf("@%s checked in", username)
-	_, err = s.mm.UpdatePost(record.PostID, &mattermost.Post{
-		ChannelID: record.ChannelID,
-		Message:   msg,
-		FileIds:   []string{fileID},
-	})
-	if err != nil {
-		return "", fmt.Errorf("update post with image: %w", err)
-	}
-
-	record.CheckInImageID = fileID
-	if err := s.store.UpdateRecord(ctx, record); err != nil {
-		return "", fmt.Errorf("update record: %w", err)
-	}
-
-	return "Image attached to your check-in!", nil
 }
 
 func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr string) error {

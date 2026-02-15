@@ -5201,7 +5201,7 @@
   "budget.msg.content_returned": "Nội dung được trả lại bởi @{Username}. Lý do: {Reason}",
   "budget.msg.approval_review": "Cần phê duyệt yêu cầu ngân sách: {Name} từ {Partner} cho {Amount}",
   "budget.msg.finance_complete": "Yêu cầu ngân sách hoàn thành: {Name} từ {Partner} cho {Amount}",
-  "attendance.msg.checked_in": "@{Username} đã check in lúc {Time}",
+  "attendance.msg.checked_in": "@{Username} đã vào ca lúc {Time}",
   "attendance.msg.break_start": "@{Username} bắt đầu nghỉ lúc {Time}. Lý do: {Reason}",
   "attendance.msg.break_end": "@{Username} kết thúc nghỉ lúc {Time}",
   "attendance.msg.checked_out": "@{Username} đã check out lúc {Time}",

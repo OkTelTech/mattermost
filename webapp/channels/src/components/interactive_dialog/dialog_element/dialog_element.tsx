@@ -23,6 +23,8 @@ import RadioSetting from 'components/widgets/settings/radio_setting';
 import TextSetting from 'components/widgets/settings/text_setting';
 import type {InputTypes} from 'components/widgets/settings/text_setting';
 
+import FileUploadSetting from './file_upload_setting';
+
 const TEXT_DEFAULT_MAX_LENGTH = 150;
 const TEXTAREA_DEFAULT_MAX_LENGTH = 3000;
 
@@ -44,6 +46,8 @@ export type Props = {
     value?: string | number | boolean;
     onChange: (name: string, selected: string) => void;
     autoFocus?: boolean;
+    accept?: string;
+    channelId?: string;
     actions: {
         autocompleteActiveChannels: (term: string, success: (channels: Channel[]) => void, error?: (err: ServerError) => void) => (ActionResult | Promise<ActionResult | ActionResult[]>);
         autocompleteUsers: (search: string) => Promise<UserAutocomplete>;
@@ -217,6 +221,18 @@ export default class DialogElement extends React.PureComponent<Props, State> {
                     helpText={helpTextContent}
                     options={options}
                     value={textValue}
+                    onChange={onChange}
+                />
+            );
+        } else if (type === 'file') {
+            return (
+                <FileUploadSetting
+                    id={name}
+                    label={displayNameContent}
+                    helpText={helpTextContent}
+                    accept={this.props.accept}
+                    channelId={this.props.channelId || ''}
+                    value={value as string}
                     onChange={onChange}
                 />
             );

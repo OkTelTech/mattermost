@@ -24,16 +24,22 @@ func NewAttendanceService(store *store.AttendanceStore, mm *mattermost.Client, b
 	return &AttendanceService{store: store, mm: mm, botURL: botURL}
 }
 
-func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID string) (string, error) {
+// CheckInResult holds the result of a check-in operation.
+type CheckInResult struct {
+	Message string
+	PostID  string
+}
+
+func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID string) (*CheckInResult, error) {
 	now := time.Now()
 	date := now.Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
-		return "", fmt.Errorf("get today record: %w", err)
+		return nil, fmt.Errorf("get today record: %w", err)
 	}
 	if record != nil {
-		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_in", map[string]any{
+		return nil, fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_in", map[string]any{
 			"Username": username, "Time": record.CheckIn.Format(time.TimeOnly),
 		}))
 	}
@@ -41,7 +47,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 	// Get channel info to retrieve TeamID
 	channelInfo, err := s.mm.GetChannel(channelID)
 	if err != nil {
-		return "", fmt.Errorf("get channel info: %w", err)
+		return nil, fmt.Errorf("get channel info: %w", err)
 	}
 
 	record = &model.AttendanceRecord{
@@ -54,30 +60,38 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		Status:    model.AttendanceStatusWorking,
 	}
 	if err := s.store.CreateRecord(ctx, record); err != nil {
-		return "", fmt.Errorf("create record: %w", err)
+		return nil, fmt.Errorf("create record: %w", err)
 	}
 
-	post, err := s.mm.CreatePost(&mattermost.Post{
+	msg := "@" + username
+	msgData := map[string]any{
+		"Username": username,
+		"Time":     now.Unix(),
+	}
+	if fileID != "" {
+		msgData["FileID"] = fileID
+		record.CheckInImageID = fileID
+	}
+	postReq := &mattermost.Post{
 		ChannelID: channelID,
-		Message:   "@" + username,
+		Message:   msg,
 		Props: mattermost.Props{
-			MessageKey: "attendance.msg.checked_in",
-			MessageData: map[string]any{
-				"Username": username,
-				"Time":     now.Unix(),
-			},
+			MessageKey:  "attendance.msg.checked_in",
+			MessageData: msgData,
 		},
-	})
+	}
+
+	post, err := s.mm.CreatePost(postReq)
 	if err != nil {
-		return "", fmt.Errorf("create post: %w", err)
+		return nil, fmt.Errorf("create post: %w", err)
 	}
 
 	record.PostID = post.ID
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
-		return "", fmt.Errorf("update record: %w", err)
+		return nil, fmt.Errorf("update record: %w", err)
 	}
 
-	return fmt.Sprintf("%s checked in at %s", username, now.Format(time.TimeOnly)), nil
+	return &CheckInResult{Message: fmt.Sprintf("%s checked in at %s", username, now.Format(time.TimeOnly)), PostID: post.ID}, nil
 }
 
 func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, reason string) (string, error) {

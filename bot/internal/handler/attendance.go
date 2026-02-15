@@ -155,7 +155,7 @@ func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Re
 	})
 }
 
-// HandleCheckIn handles the check-in button click.
+// HandleCheckIn opens the check-in dialog with optional photo upload.
 func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request) {
 	var req ActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -164,12 +164,65 @@ func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request
 	}
 
 	ctx := h.localeCtx(r.Context(), req.UserID)
-	msg, err := h.svc.CheckIn(ctx, req.UserID, req.UserName, req.ChannelID)
+
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/checkin-submit",
+		Dialog: mattermost.Dialog{
+			Title:       i18n.T(ctx, "attendance.dialog.checkin_title"),
+			SubmitLabel: i18n.T(ctx, "attendance.dialog.checkin_submit"),
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: i18n.T(ctx, "attendance.field.photo"),
+					Name:        "photo",
+					Type:        "file",
+					Optional:    true,
+					HelpText:    i18n.T(ctx, "attendance.helptext.photo"),
+					Accept:      "image/*",
+				},
+			},
+		},
+	})
 	if err != nil {
-		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		log.Printf("ERROR open check-in dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.open_form")})
 		return
 	}
-	writeJSON(w, ActionResponse{EphemeralText: msg})
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleCheckInSubmit processes the check-in dialog submission.
+func (h *AttendanceHandler) HandleCheckInSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	username := sub.UserName
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+	if username == "" {
+		user, err := h.mm.GetUser(sub.UserID)
+		if err == nil {
+			username = user.Username
+		}
+	}
+
+	fileID := sub.Submission["photo"]
+
+	result, err := h.svc.CheckIn(ctx, sub.UserID, username, sub.ChannelID, fileID)
+	if err != nil {
+		log.Printf("ERROR check-in: %v", err)
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	_ = result
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // HandleBreakStart opens a dialog asking for break reason.
@@ -637,6 +690,7 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
 	mux.HandleFunc("POST /api/attendance/checkin", h.HandleCheckIn)
+	mux.HandleFunc("POST /api/attendance/checkin-submit", h.HandleCheckInSubmit)
 	mux.HandleFunc("POST /api/attendance/break-start", h.HandleBreakStart)
 	mux.HandleFunc("POST /api/attendance/break", h.HandleBreakSubmit)
 	mux.HandleFunc("POST /api/attendance/break-end", h.HandleBreakEnd)

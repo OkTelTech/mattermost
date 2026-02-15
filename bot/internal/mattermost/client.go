@@ -25,11 +25,13 @@ func NewClient(baseURL, botToken string) *Client {
 
 // Post represents a Mattermost post.
 type Post struct {
-	ID        string `json:"id,omitempty"`
-	ChannelID string `json:"channel_id"`
-	RootID    string `json:"root_id,omitempty"`
-	Message   string `json:"message"`
-	Props     Props  `json:"props,omitempty"`
+	ID        string   `json:"id,omitempty"`
+	UserID    string   `json:"user_id,omitempty"`
+	ChannelID string   `json:"channel_id"`
+	RootID    string   `json:"root_id,omitempty"`
+	Message   string   `json:"message"`
+	Props     Props    `json:"props,omitempty"`
+	FileIds   []string `json:"file_ids,omitempty"`
 }
 
 // Props holds post properties including attachments.
@@ -87,12 +89,13 @@ type Dialog struct {
 type DialogElement struct {
 	DisplayName string         `json:"display_name"`
 	Name        string         `json:"name"`
-	Type        string         `json:"type"` // "text", "textarea", "select"
+	Type        string         `json:"type"` // "text", "textarea", "select", "file"
 	SubType     string         `json:"subtype,omitempty"`
 	Placeholder string         `json:"placeholder,omitempty"`
 	HelpText    string         `json:"help_text,omitempty"`
 	Optional    bool           `json:"optional"`
 	Options     []SelectOption `json:"options,omitempty"`
+	Accept      string         `json:"accept,omitempty"`
 }
 
 // SelectOption represents an option in a select element.

@@ -17,7 +17,7 @@ type Props = OptionalPropsFromRedux & {
 };
 
 const DialogRouter: React.FC<Props> = (props) => {
-    const {isAppsFormEnabled, hasUrl} = props;
+    const {isAppsFormEnabled, hasUrl, elements} = props;
 
     // URL-less dialog = configuration error
     if (!hasUrl) {
@@ -26,7 +26,10 @@ const DialogRouter: React.FC<Props> = (props) => {
         return null; // Let calling code show ephemeral error
     }
 
-    if (isAppsFormEnabled) {
+    // Use legacy dialog for custom element types (e.g. file upload) not supported by Apps adapter
+    const hasCustomElements = elements?.some((e) => e.type === 'file');
+
+    if (isAppsFormEnabled && !hasCustomElements) {
         return <InteractiveDialogAdapter {...props}/>;
     }
 

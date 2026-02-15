@@ -11,6 +11,10 @@
   "attendance.btn.early": "早退申請",
   "attendance.btn.approve": "批准",
   "attendance.btn.reject": "拒絕",
+  "attendance.dialog.checkin_title": "簽到",
+  "attendance.dialog.checkin_submit": "簽到",
+  "attendance.field.photo": "照片",
+  "attendance.helptext.photo": "附上簽到照片（可選）",
   "attendance.dialog.break_title": "開始休息",
   "attendance.dialog.break_submit": "開始",
   "attendance.dialog.leave_title": "請假申請",
@@ -35,6 +39,7 @@
   "attendance.err.open_form": "無法開啟表單，請重試。",
   "attendance.err.missing_id": "缺少申請 ID",
 
+  "attendance.msg.checked_in": "@{{.Username}} 於 {{.Time}} 簽到",
   "attendance.msg.already_checked_in": "@{{.Username}} 今天已於 {{.Time}} 簽到",
   "attendance.msg.not_checked_in": "@{{.Username}} 今天尚未簽到",
   "attendance.msg.already_on_break": "@{{.Username}} 已在休息中",

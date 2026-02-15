@@ -100,7 +100,6 @@ class PostMessageView extends React.PureComponent<Props, State> {
                 formattedData.Time = this.props.intl.formatTime(timeDate, {
                     hour: '2-digit',
                     minute: '2-digit',
-                    second: '2-digit',
                     hour12: false,
                 });
             }

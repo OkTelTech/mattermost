@@ -66,7 +66,6 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 	msg := "@" + username
 	msgData := map[string]any{
 		"Username": username,
-		"Time":     now.Unix(),
 	}
 	if fileID != "" {
 		msgData["FileID"] = fileID
@@ -131,7 +130,6 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 			MessageKey: "attendance.msg.break_start",
 			MessageData: map[string]any{
 				"Username": username,
-				"Time":     now.Unix(),
 				"Reason":   reason,
 			},
 		},
@@ -170,7 +168,6 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 			MessageKey: "attendance.msg.break_end",
 			MessageData: map[string]any{
 				"Username": username,
-				"Time":     now.Unix(),
 			},
 		},
 	})
@@ -218,7 +215,6 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 			MessageKey: "attendance.msg.checked_out",
 			MessageData: map[string]any{
 				"Username": username,
-				"Time":     now.Unix(),
 			},
 		},
 	})

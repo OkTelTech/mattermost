@@ -39,7 +39,7 @@
   "attendance.err.open_form": "Không thể mở biểu mẫu. Vui lòng thử lại.",
   "attendance.err.missing_id": "Thiếu mã yêu cầu",
 
-  "attendance.msg.checked_in": "@{{.Username}} đã vào ca lúc {{.Time}}",
+  "attendance.msg.checked_in": "@{{.Username}} đã vào ca",
   "attendance.msg.already_checked_in": "@{{.Username}} đã vào ca hôm nay lúc {{.Time}}",
   "attendance.msg.not_checked_in": "@{{.Username}} chưa vào ca hôm nay",
   "attendance.msg.already_on_break": "@{{.Username}} đang nghỉ giải lao",

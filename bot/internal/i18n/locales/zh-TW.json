@@ -39,7 +39,7 @@
   "attendance.err.open_form": "無法開啟表單，請重試。",
   "attendance.err.missing_id": "缺少申請 ID",
 
-  "attendance.msg.checked_in": "@{{.Username}} 於 {{.Time}} 簽到",
+  "attendance.msg.checked_in": "@{{.Username}} 已簽到",
   "attendance.msg.already_checked_in": "@{{.Username}} 今天已於 {{.Time}} 簽到",
   "attendance.msg.not_checked_in": "@{{.Username}} 今天尚未簽到",
   "attendance.msg.already_on_break": "@{{.Username}} 已在休息中",

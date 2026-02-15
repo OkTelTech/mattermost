@@ -39,7 +39,7 @@
   "attendance.err.open_form": "Failed to open form. Please try again.",
   "attendance.err.missing_id": "Missing request ID",
 
-  "attendance.msg.checked_in": "@{{.Username}} checked in at {{.Time}}",
+  "attendance.msg.checked_in": "@{{.Username}} checked in",
   "attendance.msg.already_checked_in": "@{{.Username}} already checked in today at {{.Time}}",
   "attendance.msg.not_checked_in": "@{{.Username}} has not checked in today",
   "attendance.msg.already_on_break": "@{{.Username}} is already on break",

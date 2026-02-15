@@ -1,0 +1,47 @@
+.attendanceReportTable {
+    .TeamList_nameColumn {
+        display: flex;
+        align-items: center;
+        padding: 8px 0;
+
+        .TeamList_nameText {
+            overflow: hidden;
+            padding-right: 10px;
+            opacity: 0.9;
+            color: var(--center-channel-color);
+        }
+
+        .TeamList__lowerOpacity {
+            opacity: 1;
+        }
+    }
+}
+
+.system-users__filter {
+    flex-grow: 0;
+    margin-right: 12px;
+
+    .Input_container {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .attendanceDateInput {
+        .Input_fieldset {
+            width: auto;
+        }
+
+        input {
+            width: 140px;
+        }
+    }
+}
+
+.admin-console__filters-rows {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}

@@ -251,6 +251,8 @@ export default class InteractiveDialog extends React.PureComponent<Props, State>
                                         options={e.options}
                                         value={this.state.values[e.name]}
                                         onChange={this.onChange}
+                                        accept={e.accept}
+                                        channelId={this.props.channelId}
                                     />
                                 );
                             })}

@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
 
+	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/service"
 )
@@ -20,6 +22,19 @@ func NewBudgetHandler(svc *service.BudgetService, mm *mattermost.Client, botURL 
 	return &BudgetHandler{svc: svc, mm: mm, botURL: botURL}
 }
 
+// localeCtx fetches the user's locale from Mattermost and returns a context with locale set.
+func (h *BudgetHandler) localeCtx(ctx context.Context, userID string) context.Context {
+	user, err := h.mm.GetUser(userID)
+	if err != nil {
+		log.Printf("i18n: GetUser(%s) failed: %v", userID, err)
+		return ctx
+	}
+	if user.Locale == "" {
+		return ctx
+	}
+	return i18n.WithLocale(ctx, user.Locale)
+}
+
 // HandleSlashCommand handles /budget slash command - opens create dialog.
 func (h *BudgetHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -27,11 +42,13 @@ func (h *BudgetHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), r.FormValue("user_id"))
+
 	channelName := r.FormValue("channel_name")
 	if !strings.HasPrefix(channelName, "budget") {
 		writeJSON(w, SlashResponse{
 			ResponseType: "ephemeral",
-			Text:         "This command can only be used in channels with the `budget` prefix.",
+			Text:         i18n.T(ctx, "budget.channel_error"),
 		})
 		return
 	}
@@ -40,7 +57,7 @@ func (h *BudgetHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Reques
 	if triggerID == "" {
 		writeJSON(w, SlashResponse{
 			ResponseType: "ephemeral",
-			Text:         "Missing trigger_id. Please try again.",
+			Text:         i18n.T(ctx, "budget.err.missing_trigger"),
 		})
 		return
 	}
@@ -49,14 +66,14 @@ func (h *BudgetHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Reques
 		TriggerID: triggerID,
 		URL:       h.botURL + "/api/budget/sale-create",
 		Dialog: mattermost.Dialog{
-			Title:       "Budget Request",
-			SubmitLabel: "Submit",
+			Title:       i18n.T(ctx, "budget.dialog.create_title"),
+			SubmitLabel: i18n.T(ctx, "budget.dialog.submit"),
 			Elements: []mattermost.DialogElement{
-				{DisplayName: "Name", Name: "name", Type: "text"},
-				{DisplayName: "Partner", Name: "partner", Type: "text", Placeholder: "e.g. facebook"},
-				{DisplayName: "Amount", Name: "amount", Type: "text", Placeholder: "e.g. 30$ or 30VND"},
-				{DisplayName: "Purpose", Name: "purpose", Type: "textarea"},
-				{DisplayName: "Deadline", Name: "deadline", Type: "text", SubType: "date", Placeholder: "YYYY-MM-DD"},
+				{DisplayName: i18n.T(ctx, "budget.field.name"), Name: "name", Type: "text"},
+				{DisplayName: i18n.T(ctx, "budget.field.partner"), Name: "partner", Type: "text", Placeholder: i18n.T(ctx, "budget.placeholder.partner")},
+				{DisplayName: i18n.T(ctx, "budget.field.amount"), Name: "amount", Type: "text", Placeholder: i18n.T(ctx, "budget.placeholder.amount")},
+				{DisplayName: i18n.T(ctx, "budget.field.purpose"), Name: "purpose", Type: "textarea"},
+				{DisplayName: i18n.T(ctx, "budget.field.deadline"), Name: "deadline", Type: "text", SubType: "date", Placeholder: i18n.T(ctx, "budget.placeholder.deadline")},
 			},
 		},
 	})
@@ -64,7 +81,7 @@ func (h *BudgetHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Reques
 		log.Printf("ERROR open budget dialog: %v", err)
 		writeJSON(w, SlashResponse{
 			ResponseType: "ephemeral",
-			Text:         "Failed to open form. Please try again.",
+			Text:         i18n.T(ctx, "budget.err.open_form"),
 		})
 		return
 	}
@@ -84,8 +101,10 @@ func (h *BudgetHandler) HandleSaleCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+
 	err := h.svc.CreateRequest(
-		r.Context(),
+		ctx,
 		sub.UserID,
 		sub.ChannelID,
 		sub.Submission["name"],
@@ -111,25 +130,26 @@ func (h *BudgetHandler) HandlePartnerContentForm(w http.ResponseWriter, r *http.
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
 	requestID, _ := req.Context["request_id"].(string)
 
 	err := h.mm.OpenDialog(&mattermost.DialogRequest{
 		TriggerID: req.TriggerID,
 		URL:       h.botURL + "/api/budget/partner-content",
 		Dialog: mattermost.Dialog{
-			Title:       "Budget - Post Content",
+			Title:       i18n.T(ctx, "budget.dialog.content_title"),
 			CallbackID:  requestID,
-			SubmitLabel: "Submit",
+			SubmitLabel: i18n.T(ctx, "budget.dialog.submit"),
 			Elements: []mattermost.DialogElement{
-				{DisplayName: "Post Content", Name: "post_content", Type: "textarea"},
-				{DisplayName: "Post Link", Name: "post_link", Type: "text", Optional: true},
-				{DisplayName: "Page Link", Name: "page_link", Type: "text", Optional: true},
+				{DisplayName: i18n.T(ctx, "budget.field.post_content"), Name: "post_content", Type: "textarea"},
+				{DisplayName: i18n.T(ctx, "budget.field.post_link"), Name: "post_link", Type: "text", Optional: true},
+				{DisplayName: i18n.T(ctx, "budget.field.page_link"), Name: "page_link", Type: "text", Optional: true},
 			},
 		},
 	})
 	if err != nil {
 		log.Printf("ERROR open partner content dialog: %v", err)
-		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form."})
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "budget.err.open_form")})
 		return
 	}
 	writeJSON(w, ActionResponse{})
@@ -147,8 +167,10 @@ func (h *BudgetHandler) HandlePartnerContentSubmit(w http.ResponseWriter, r *htt
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+
 	err := h.svc.SubmitContent(
-		r.Context(),
+		ctx,
 		sub.CallbackID,
 		sub.UserID,
 		sub.Submission["post_content"],
@@ -171,14 +193,15 @@ func (h *BudgetHandler) HandleTLQCConfirm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
 	requestID, _ := req.Context["request_id"].(string)
 
-	err := h.svc.ConfirmTLQC(r.Context(), requestID, req.UserID)
+	err := h.svc.ConfirmTLQC(ctx, requestID, req.UserID)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{EphemeralText: "TLQC confirmed. Waiting for payment info..."})
+	writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "budget.msg.tlqc_confirmed")})
 }
 
 // HandleTLQCReturnForm opens the return reason dialog for TLQC.
@@ -189,23 +212,24 @@ func (h *BudgetHandler) HandleTLQCReturnForm(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
 	requestID, _ := req.Context["request_id"].(string)
 
 	err := h.mm.OpenDialog(&mattermost.DialogRequest{
 		TriggerID: req.TriggerID,
 		URL:       h.botURL + "/api/budget/tlqc-return",
 		Dialog: mattermost.Dialog{
-			Title:       "Return to Partner",
+			Title:       i18n.T(ctx, "budget.dialog.return_title"),
 			CallbackID:  requestID,
-			SubmitLabel: "Return",
+			SubmitLabel: i18n.T(ctx, "budget.dialog.return"),
 			Elements: []mattermost.DialogElement{
-				{DisplayName: "Reason", Name: "reason", Type: "textarea"},
+				{DisplayName: i18n.T(ctx, "budget.field.reason"), Name: "reason", Type: "textarea"},
 			},
 		},
 	})
 	if err != nil {
 		log.Printf("ERROR open tlqc return dialog: %v", err)
-		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form."})
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "budget.err.open_form")})
 		return
 	}
 	writeJSON(w, ActionResponse{})
@@ -223,7 +247,9 @@ func (h *BudgetHandler) HandleTLQCReturnSubmit(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	err := h.svc.ReturnToPartner(r.Context(), sub.CallbackID, sub.UserID, sub.Submission["reason"])
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+
+	err := h.svc.ReturnToPartner(ctx, sub.CallbackID, sub.UserID, sub.Submission["reason"])
 	if err != nil {
 		log.Printf("ERROR return to partner: %v", err)
 		writeJSON(w, map[string]string{"error": err.Error()})
@@ -240,26 +266,27 @@ func (h *BudgetHandler) HandlePartnerPaymentForm(w http.ResponseWriter, r *http.
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
 	requestID, _ := req.Context["request_id"].(string)
 
 	err := h.mm.OpenDialog(&mattermost.DialogRequest{
 		TriggerID: req.TriggerID,
 		URL:       h.botURL + "/api/budget/partner-payment",
 		Dialog: mattermost.Dialog{
-			Title:       "Budget - Payment Info",
+			Title:       i18n.T(ctx, "budget.dialog.payment_title"),
 			CallbackID:  requestID,
-			SubmitLabel: "Submit",
+			SubmitLabel: i18n.T(ctx, "budget.dialog.submit"),
 			Elements: []mattermost.DialogElement{
-				{DisplayName: "Recipient Name", Name: "recipient_name", Type: "text"},
-				{DisplayName: "Bank Account", Name: "bank_account", Type: "text"},
-				{DisplayName: "Bank Name", Name: "bank_name", Type: "text"},
-				{DisplayName: "Payment Amount", Name: "payment_amount", Type: "text", Placeholder: "e.g. 30$ or 30VND"},
+				{DisplayName: i18n.T(ctx, "budget.field.recipient"), Name: "recipient_name", Type: "text"},
+				{DisplayName: i18n.T(ctx, "budget.field.bank_account"), Name: "bank_account", Type: "text"},
+				{DisplayName: i18n.T(ctx, "budget.field.bank_name"), Name: "bank_name", Type: "text"},
+				{DisplayName: i18n.T(ctx, "budget.field.payment_amount"), Name: "payment_amount", Type: "text", Placeholder: i18n.T(ctx, "budget.placeholder.amount")},
 			},
 		},
 	})
 	if err != nil {
 		log.Printf("ERROR open partner payment dialog: %v", err)
-		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form."})
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "budget.err.open_form")})
 		return
 	}
 	writeJSON(w, ActionResponse{})
@@ -277,8 +304,10 @@ func (h *BudgetHandler) HandlePartnerPaymentSubmit(w http.ResponseWriter, r *htt
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+
 	err := h.svc.SubmitPayment(
-		r.Context(),
+		ctx,
 		sub.CallbackID,
 		sub.Submission["recipient_name"],
 		sub.Submission["bank_account"],
@@ -301,14 +330,15 @@ func (h *BudgetHandler) HandleApprovalApprove(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
 	requestID, _ := req.Context["request_id"].(string)
 
-	err := h.svc.Approve(r.Context(), requestID, req.UserID)
+	err := h.svc.Approve(ctx, requestID, req.UserID)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{EphemeralText: "Approved. Waiting for finance..."})
+	writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "budget.msg.approved")})
 }
 
 // HandleFinanceCompleteForm opens the completion dialog for finance.
@@ -319,24 +349,25 @@ func (h *BudgetHandler) HandleFinanceCompleteForm(w http.ResponseWriter, r *http
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
 	requestID, _ := req.Context["request_id"].(string)
 
 	err := h.mm.OpenDialog(&mattermost.DialogRequest{
 		TriggerID: req.TriggerID,
 		URL:       h.botURL + "/api/budget/finance-complete",
 		Dialog: mattermost.Dialog{
-			Title:       "Budget - Complete",
+			Title:       i18n.T(ctx, "budget.dialog.complete_title"),
 			CallbackID:  requestID,
-			SubmitLabel: "Complete",
+			SubmitLabel: i18n.T(ctx, "budget.dialog.complete"),
 			Elements: []mattermost.DialogElement{
-				{DisplayName: "Transaction Code", Name: "transaction_code", Type: "text"},
-				{DisplayName: "Bill URL", Name: "bill_url", Type: "text", Optional: true, Placeholder: "URL or reference"},
+				{DisplayName: i18n.T(ctx, "budget.field.transaction_code"), Name: "transaction_code", Type: "text"},
+				{DisplayName: i18n.T(ctx, "budget.field.bill_url"), Name: "bill_url", Type: "text", Optional: true, Placeholder: i18n.T(ctx, "budget.placeholder.bill")},
 			},
 		},
 	})
 	if err != nil {
 		log.Printf("ERROR open finance complete dialog: %v", err)
-		writeJSON(w, ActionResponse{EphemeralText: "Failed to open form."})
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "budget.err.open_form")})
 		return
 	}
 	writeJSON(w, ActionResponse{})
@@ -354,8 +385,10 @@ func (h *BudgetHandler) HandleFinanceCompleteSubmit(w http.ResponseWriter, r *ht
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+
 	err := h.svc.Complete(
-		r.Context(),
+		ctx,
 		sub.CallbackID,
 		sub.Submission["transaction_code"],
 		sub.Submission["bill_url"],
@@ -377,14 +410,15 @@ func (h *BudgetHandler) HandleReject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
 	requestID, _ := req.Context["request_id"].(string)
 
-	err := h.svc.RejectRequest(r.Context(), requestID, req.UserID)
+	err := h.svc.RejectRequest(ctx, requestID, req.UserID)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{EphemeralText: "Request rejected."})
+	writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "budget.msg.rejected")})
 }
 
 // RegisterRoutes registers all budget routes on the given mux.

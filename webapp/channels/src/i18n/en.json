@@ -6795,5 +6795,20 @@
   "youtube_video.play.aria_label": "Play {videoTitle} on YouTube",
   "youtube_video.thumbnail.alt_text": "Thumbnail for {videoTitle} on YouTube",
   "global_header.productChannels": "Channels",
-  "plugin.upload": "Voice message"
+  "plugin.upload": "Voice message",
+  "budget.msg.request_created": "New budget request created: {Name} from {Partner} for {Amount}",
+  "budget.msg.partner_fill_content": "Please fill in the content for request: {Name} from {Partner} for {Amount}",
+  "budget.msg.partner_resubmit": "@{Username} please resubmit the content",
+  "budget.msg.fill_payment": "@{Username} please fill in the payment information",
+  "budget.msg.content_returned": "Content returned by @{Username}. Reason: {Reason}",
+  "budget.msg.approval_review": "Approval needed for budget request: {Name} from {Partner} for {Amount}",
+  "budget.msg.finance_complete": "Budget request completed: {Name} from {Partner} for {Amount}",
+  "attendance.msg.checked_in": "@{Username} checked in",
+  "attendance.msg.break_start": "@{Username} started break. Reason: {Reason}",
+  "attendance.msg.break_end": "@{Username} ended break",
+  "attendance.msg.checked_out": "@{Username} checked out",
+  "attendance.msg.approved": "@{Username} your leave request has been approved by {Approver}",
+  "attendance.msg.rejected": "@{Username} your leave request has been rejected by {Approver}",
+  "leave.msg.request_info": "Leave Request: {LeaveType} from {Username}. Dates: {Dates}. Reason: {Reason}. Expected Time: {ExpectedTime}. Status: {Status}",
+  "leave.msg.request_approval": "Leave Request Approval: {LeaveType} from {Username}. Dates: {Dates}. Reason: {Reason}. Expected Time: {ExpectedTime}. Status: {Status}"
 }

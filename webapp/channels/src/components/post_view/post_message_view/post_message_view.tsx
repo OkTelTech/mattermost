@@ -2,7 +2,8 @@
 // See LICENSE.txt for license information.
 
 import React from 'react';
-import {FormattedMessage} from 'react-intl';
+import {FormattedMessage, injectIntl} from 'react-intl';
+import type {IntlShape} from 'react-intl';
 
 import type {Post} from '@mattermost/types/posts';
 
@@ -46,6 +47,7 @@ type Props = {
     maxHeight?: number; /* The max height used by the show more component */
     showPostEditedIndicator?: boolean; /* Whether or not to render the post edited indicator */
     sharedChannelsPluginsEnabled?: boolean;
+    intl: IntlShape; /* For injectIntl */
 }
 
 type State = {
@@ -54,7 +56,7 @@ type State = {
     checkOverflow: number;
 }
 
-export default class PostMessageView extends React.PureComponent<Props, State> {
+class PostMessageView extends React.PureComponent<Props, State> {
     private imageProps: any;
 
     static defaultProps = {
@@ -77,6 +79,47 @@ export default class PostMessageView extends React.PureComponent<Props, State> {
             onImageLoaded: this.handleHeightReceived,
             onImageHeightChanged: this.checkPostOverflow,
         };
+    }
+
+    /**
+     * Translate message if it has a message_key in Props
+     */
+    private getTranslatedMessage(post: Post): string {
+        if (post.props?.message_key && post.props?.message_data) {
+            const messageKey = post.props.message_key;
+            const messageData = post.props.message_data as Record<string, any>;
+
+            const formattedData = {...messageData};
+
+            // Extract non-template keys before ICU formatting
+            const fileID = formattedData.FileID;
+            delete formattedData.FileID;
+
+            if (formattedData.Time && typeof formattedData.Time === 'number') {
+                const timeDate = new Date(formattedData.Time * 1000);
+                formattedData.Time = this.props.intl.formatTime(timeDate, {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                });
+            }
+
+            try {
+                let translated = this.props.intl.formatMessage(
+                    {id: messageKey, defaultMessage: post.message},
+                    formattedData,
+                );
+                if (fileID) {
+                    translated += `\n\n![photo](/api/v4/files/${fileID}/preview)`;
+                }
+                return translated;
+            } catch (e) {
+                // If translation fails, fall back to original message
+                console.warn(`Failed to translate message key: ${messageKey}`, e);
+                return post.message;
+            }
+        }
+        return post.message;
     }
 
     checkPostOverflow = () => {
@@ -126,7 +169,7 @@ export default class PostMessageView extends React.PureComponent<Props, State> {
         }
 
         if (!enableFormatting) {
-            return <span>{post.message}</span>;
+            return <span>{this.getTranslatedMessage(post)}</span>;
         }
 
         const postType = typeof post.props?.type === 'string' ? post.props.type : post.type;
@@ -143,7 +186,7 @@ export default class PostMessageView extends React.PureComponent<Props, State> {
             );
         }
 
-        let message = post.message;
+        let message = this.getTranslatedMessage(post);
         const isEphemeral = isPostEphemeral(post);
         if (compactDisplay && isEphemeral) {
             const visibleMessage = Utils.localizeMessage({id: 'post_info.message.visible.compact', defaultMessage: ' (Only visible to you)'});
@@ -200,3 +243,5 @@ export default class PostMessageView extends React.PureComponent<Props, State> {
         );
     }
 }
+
+export default injectIntl(PostMessageView);

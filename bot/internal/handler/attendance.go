@@ -686,8 +686,8 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
-// HandleReport returns attendance statistics filtered by date range and optionally by user.
-// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), user_id (optional).
+// HandleReport returns attendance statistics filtered by date range and optionally by user and/or team.
+// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), user_id (optional), team_id (optional).
 func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	from := q.Get("from")
@@ -697,7 +697,7 @@ func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	report, err := h.svc.GetReport(r.Context(), from, to, q.Get("user_id"))
+	report, err := h.svc.GetReport(r.Context(), from, to, q.Get("user_id"), q.Get("team_id"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

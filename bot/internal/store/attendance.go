@@ -136,11 +136,14 @@ func (s *AttendanceStore) GetAttendanceByDate(ctx context.Context, date string) 
 	return results, nil
 }
 
-// GetAttendanceByDateRange returns attendance records within a date range, optionally filtered by user.
-func (s *AttendanceStore) GetAttendanceByDateRange(ctx context.Context, from, to, userID string) ([]*model.AttendanceRecord, error) {
+// GetAttendanceByDateRange returns attendance records within a date range, optionally filtered by user and/or team.
+func (s *AttendanceStore) GetAttendanceByDateRange(ctx context.Context, from, to, userID, teamID string) ([]*model.AttendanceRecord, error) {
 	filter := bson.M{"date": bson.M{"$gte": from, "$lte": to}}
 	if userID != "" {
 		filter["user_id"] = userID
+	}
+	if teamID != "" {
+		filter["team_id"] = teamID
 	}
 	cursor, err := s.attendance.Find(ctx, filter)
 	if err != nil {
@@ -153,11 +156,14 @@ func (s *AttendanceStore) GetAttendanceByDateRange(ctx context.Context, from, to
 	return results, nil
 }
 
-// GetLeaveRequestsByDateRange returns leave requests that overlap with a date range, optionally filtered by user.
-func (s *AttendanceStore) GetLeaveRequestsByDateRange(ctx context.Context, from, to, userID string) ([]*model.LeaveRequest, error) {
+// GetLeaveRequestsByDateRange returns leave requests that overlap with a date range, optionally filtered by user and/or team.
+func (s *AttendanceStore) GetLeaveRequestsByDateRange(ctx context.Context, from, to, userID, teamID string) ([]*model.LeaveRequest, error) {
 	filter := bson.M{"dates": bson.M{"$elemMatch": bson.M{"$gte": from, "$lte": to}}}
 	if userID != "" {
 		filter["user_id"] = userID
+	}
+	if teamID != "" {
+		filter["team_id"] = teamID
 	}
 	cursor, err := s.leave.Find(ctx, filter)
 	if err != nil {

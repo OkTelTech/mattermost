@@ -6786,5 +6786,20 @@
   "youtube_video.play.aria_label": "在 YouTube 上播放 {videoTitle}",
   "youtube_video.thumbnail.alt_text": "YouTube 上的 {videoTitle} 的缩略圖",
   "global_header.productChannels": "頻道",
-  "plugin.upload": "語音訊息"
+  "plugin.upload": "語音訊息",
+  "budget.msg.request_created": "新預算申請：{Name} 來自 {Partner}，金額 {Amount}",
+  "budget.msg.partner_fill_content": "請為申請填寫內容：{Name} 來自 {Partner}，金額 {Amount}",
+  "budget.msg.partner_resubmit": "@{Username} 請重新提交內容",
+  "budget.msg.fill_payment": "@{Username} 請填寫付款資訊",
+  "budget.msg.content_returned": "內容由 @{Username} 退回。原因：{Reason}",
+  "budget.msg.approval_review": "需要審批預算申請：{Name} 來自 {Partner}，金額 {Amount}",
+  "budget.msg.finance_complete": "預算申請已完成：{Name} 來自 {Partner}，金額 {Amount}",
+  "attendance.msg.checked_in": "@{Username} 於 {Time} 簽到",
+  "attendance.msg.break_start": "@{Username} 於 {Time} 開始休息。原因：{Reason}",
+  "attendance.msg.break_end": "@{Username} 於 {Time} 結束休息",
+  "attendance.msg.checked_out": "@{Username} 於 {Time} 簽退",
+  "attendance.msg.approved": "@{Username} 您的休假申請已被 {Approver} 批准",
+  "attendance.msg.rejected": "@{Username} 您的休假申請已被 {Approver} 拒絕",
+  "leave.msg.request_info": "休假申請：{LeaveType} 來自 {Username}。日期：{Dates}。原因：{Reason}。預計時間：{ExpectedTime}。狀態：{Status}",
+  "leave.msg.request_approval": "休假申請審批：{LeaveType} 來自 {Username}。日期：{Dates}。原因：{Reason}。預計時間：{ExpectedTime}。狀態：{Status}"
 }

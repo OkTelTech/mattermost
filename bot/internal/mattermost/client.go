@@ -36,7 +36,9 @@ type Post struct {
 
 // Props holds post properties including attachments.
 type Props struct {
-	Attachments []Attachment `json:"attachments"`
+	Attachments []Attachment   `json:"attachments"`
+	MessageKey  string         `json:"message_key,omitempty"`
+	MessageData map[string]any `json:"message_data,omitempty"`
 }
 
 // Attachment represents a Mattermost message attachment.
@@ -186,6 +188,7 @@ func (c *Client) GetUser(userID string) (*UserInfo, error) {
 type UserInfo struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
+	Locale   string `json:"locale"`
 }
 
 // GetChannel retrieves channel info by ID.

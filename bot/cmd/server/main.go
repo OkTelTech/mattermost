@@ -11,6 +11,7 @@ import (
 
 	"oktel-bot/internal/config"
 	"oktel-bot/internal/handler"
+	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/service"
 	"oktel-bot/internal/store"
@@ -18,6 +19,7 @@ import (
 
 func main() {
 	cfg := config.Load()
+	i18n.Init("")
 
 	// Connect to MongoDB
 	mainCtx := context.Background()

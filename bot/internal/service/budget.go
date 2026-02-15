@@ -8,6 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
 	"oktel-bot/internal/store"
@@ -96,12 +97,19 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, na
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetStatus(req, "Step 1/6 - Sale Created")
 
 	// Post info to budget-sale (no buttons)
 	salePost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: channels.Sale,
-		Message:   "@all\n" + infoMsg,
+		Message:   "@all",
+		Props: mattermost.Props{
+			MessageKey: "budget.msg.request_created",
+			MessageData: map[string]any{
+				"Name":    name,
+				"Partner": partner,
+				"Amount":  amount,
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("post to sale channel: %w", err)
@@ -110,12 +118,18 @@ func (s *BudgetService) CreateRequest(ctx context.Context, userID, channelID, na
 	// Post to budget-partner-{partner} with content button
 	partnerPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: channels.Partner,
-		Message:   "@all\n" + infoMsg,
+		Message:   "@all",
 		Props: mattermost.Props{
+			MessageKey: "budget.msg.partner_fill_content",
+			MessageData: map[string]any{
+				"Name":    name,
+				"Partner": partner,
+				"Amount":  amount,
+			},
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
-						Name: "Fill Post Content",
+						Name: i18n.T(ctx, "budget.btn.fill_content"),
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + "/api/budget/partner-content-form",
@@ -155,9 +169,11 @@ func (s *BudgetService) SubmitContent(ctx context.Context, requestID, userID, po
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetStatus(req, "Step 2/6 - Partner Content Added")
-	contentDetail := fmt.Sprintf("\n| **Post Content** | %s |\n| **Post Link** | %s |\n| **Page Link** | %s |",
-		postContent, postLink, pageLink)
+	infoMsg := formatBudgetStatus(ctx, req, i18n.T(ctx, "budget.status.step2"))
+	contentDetail := fmt.Sprintf("\n| %s | %s |\n| %s | %s |\n| %s | %s |",
+		i18n.T(ctx, "budget.info.post_content"), postContent,
+		i18n.T(ctx, "budget.info.post_link"), postLink,
+		i18n.T(ctx, "budget.info.page_link"), pageLink)
 
 	// Update partner post (remove button, show content)
 	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
@@ -172,7 +188,7 @@ func (s *BudgetService) SubmitContent(ctx context.Context, requestID, userID, po
 		Attachments: []mattermost.Attachment{{
 			Actions: []mattermost.Action{
 				{
-					Name: "Confirm",
+					Name: i18n.T(ctx, "budget.btn.confirm"),
 					Type: "button",
 					Integration: mattermost.Integration{
 						URL:     s.botURL + "/api/budget/tlqc-confirm",
@@ -180,7 +196,7 @@ func (s *BudgetService) SubmitContent(ctx context.Context, requestID, userID, po
 					},
 				},
 				{
-					Name: "Return to Partner",
+					Name: i18n.T(ctx, "budget.btn.return"),
 					Type: "button",
 					Integration: mattermost.Integration{
 						URL:     s.botURL + "/api/budget/tlqc-return-form",
@@ -202,7 +218,13 @@ func (s *BudgetService) SubmitContent(ctx context.Context, requestID, userID, po
 		s.mm.CreatePost(&mattermost.Post{
 			ChannelID: req.TLQCChannelID,
 			RootID:    req.TLQCPostID,
-			Message:   tlqcMention + " Partner has resubmitted the content. Please review.",
+			Message:   tlqcMention,
+			Props: mattermost.Props{
+				MessageKey: "budget.msg.partner_resubmit",
+				MessageData: map[string]any{
+					"Username": s.extractUsername(tlqcMention),
+				},
+			},
 		})
 	} else {
 		// First submit: create new TLQC post
@@ -243,7 +265,7 @@ func (s *BudgetService) ConfirmTLQC(ctx context.Context, requestID, userID strin
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetStatus(req, "Step 3/6 - TLQC Confirmed")
+	infoMsg := formatBudgetStatus(ctx, req, i18n.T(ctx, "budget.status.step3"))
 
 	// Update TLQC post (remove button)
 	s.mm.UpdatePost(req.TLQCPostID, &mattermost.Post{
@@ -262,7 +284,7 @@ func (s *BudgetService) ConfirmTLQC(ctx context.Context, requestID, userID strin
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
-						Name: "Fill Payment Info",
+						Name: i18n.T(ctx, "budget.btn.fill_payment"),
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + "/api/budget/partner-payment-form",
@@ -279,7 +301,13 @@ func (s *BudgetService) ConfirmTLQC(ctx context.Context, requestID, userID strin
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.PartnerChannelID,
 		RootID:    req.PartnerPostID,
-		Message:   partnerMention + " Content confirmed by TLQC. Please fill in the payment info.",
+		Message:   partnerMention,
+		Props: mattermost.Props{
+			MessageKey: "budget.msg.fill_payment",
+			MessageData: map[string]any{
+				"Username": s.extractUsername(partnerMention),
+			},
+		},
 	})
 
 	// Update sale post status
@@ -314,12 +342,12 @@ func (s *BudgetService) ReturnToPartner(ctx context.Context, requestID, userID, 
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetStatus(req, "Step 1/6 - Returned by TLQC, please redo content")
+	infoMsg := formatBudgetStatus(ctx, req, i18n.T(ctx, "budget.status.returned"))
 
 	// Update TLQC post (remove buttons)
 	s.mm.UpdatePost(req.TLQCPostID, &mattermost.Post{
 		ChannelID: req.TLQCChannelID,
-		Message:   formatBudgetStatus(req, "Returned to Partner for rework"),
+		Message:   formatBudgetStatus(ctx, req, i18n.T(ctx, "budget.status.returned_rework")),
 		Props: mattermost.Props{
 			Attachments: []mattermost.Attachment{},
 		},
@@ -333,7 +361,7 @@ func (s *BudgetService) ReturnToPartner(ctx context.Context, requestID, userID, 
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
-						Name: "Fill Post Content",
+						Name: i18n.T(ctx, "budget.btn.fill_content"),
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + "/api/budget/partner-content-form",
@@ -349,7 +377,14 @@ func (s *BudgetService) ReturnToPartner(ctx context.Context, requestID, userID, 
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.PartnerChannelID,
 		RootID:    req.PartnerPostID,
-		Message:   fmt.Sprintf("%s Content returned by TLQC. Please redo and resubmit.\n**Reason:** %s", partnerMention, reason),
+		Message:   partnerMention,
+		Props: mattermost.Props{
+			MessageKey: "budget.msg.content_returned",
+			MessageData: map[string]any{
+				"Username": s.extractUsername(partnerMention),
+				"Reason":   reason,
+			},
+		},
 	})
 
 	// Update sale post status
@@ -381,9 +416,12 @@ func (s *BudgetService) SubmitPayment(ctx context.Context, requestID, recipientN
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetStatus(req, "Step 4/6 - Payment Info Added")
-	paymentDetail := fmt.Sprintf("\n| **Recipient** | %s |\n| **Bank Account** | %s |\n| **Bank** | %s |\n| **Payment Amount** | %s |",
-		recipientName, bankAccount, bankName, paymentAmount)
+	infoMsg := formatBudgetStatus(ctx, req, i18n.T(ctx, "budget.status.step4"))
+	paymentDetail := fmt.Sprintf("\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |",
+		i18n.T(ctx, "budget.info.recipient"), recipientName,
+		i18n.T(ctx, "budget.info.bank_account"), bankAccount,
+		i18n.T(ctx, "budget.info.bank"), bankName,
+		i18n.T(ctx, "budget.info.payment_amount"), paymentAmount)
 
 	// Update partner post (remove button, show payment info)
 	s.mm.UpdatePost(req.PartnerPostID, &mattermost.Post{
@@ -397,12 +435,18 @@ func (s *BudgetService) SubmitPayment(ctx context.Context, requestID, recipientN
 	// Create post in budget-approval with approve + reject buttons
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
-		Message:   "@all\n" + infoMsg + paymentDetail,
+		Message:   "@all",
 		Props: mattermost.Props{
+			MessageKey: "budget.msg.approval_review",
+			MessageData: map[string]any{
+				"Name":    req.Name,
+				"Partner": req.Partner,
+				"Amount":  req.Amount,
+			},
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
-						Name: "Approve",
+						Name: i18n.T(ctx, "budget.btn.approve"),
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + "/api/budget/approval-approve",
@@ -410,7 +454,7 @@ func (s *BudgetService) SubmitPayment(ctx context.Context, requestID, recipientN
 						},
 					},
 					{
-						Name: "Reject",
+						Name: i18n.T(ctx, "budget.btn.reject"),
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + "/api/budget/reject",
@@ -452,7 +496,7 @@ func (s *BudgetService) Approve(ctx context.Context, requestID, userID string) e
 	}
 
 	idHex := req.ID.Hex()
-	infoMsg := formatBudgetStatus(req, "Step 5/6 - Approved")
+	infoMsg := formatBudgetStatus(ctx, req, i18n.T(ctx, "budget.status.step5"))
 
 	// Update approval post (remove buttons)
 	s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
@@ -466,12 +510,18 @@ func (s *BudgetService) Approve(ctx context.Context, requestID, userID string) e
 	// Create post in budget-finance with complete button
 	financePost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.FinanceChannelID,
-		Message:   "@all\n" + infoMsg,
+		Message:   "@all",
 		Props: mattermost.Props{
+			MessageKey: "budget.msg.finance_complete",
+			MessageData: map[string]any{
+				"Name":    req.Name,
+				"Partner": req.Partner,
+				"Amount":  req.Amount,
+			},
 			Attachments: []mattermost.Attachment{{
 				Actions: []mattermost.Action{
 					{
-						Name: "Complete",
+						Name: i18n.T(ctx, "budget.btn.complete"),
 						Type: "button",
 						Integration: mattermost.Integration{
 							URL:     s.botURL + "/api/budget/finance-complete-form",
@@ -514,7 +564,7 @@ func (s *BudgetService) Complete(ctx context.Context, requestID, transactionCode
 		return err
 	}
 
-	completedMsg := formatCompletedMsg(req)
+	completedMsg := formatCompletedMsg(ctx, req)
 	s.updateAllPosts(req, completedMsg)
 	return nil
 }
@@ -531,13 +581,13 @@ func (s *BudgetService) RejectRequest(ctx context.Context, requestID, userID str
 		return err
 	}
 	if req == nil {
-		return fmt.Errorf("budget request not found")
+		return fmt.Errorf(i18n.T(ctx, "budget.err.not_found"))
 	}
 	if req.CurrentStep >= model.BudgetStepCompleted {
-		return fmt.Errorf("request is already completed")
+		return fmt.Errorf(i18n.T(ctx, "budget.err.already_completed"))
 	}
 	if req.RejectedAt != nil {
-		return fmt.Errorf("request is already rejected")
+		return fmt.Errorf(i18n.T(ctx, "budget.err.already_rejected"))
 	}
 
 	now := time.Now()
@@ -546,7 +596,7 @@ func (s *BudgetService) RejectRequest(ctx context.Context, requestID, userID str
 		return err
 	}
 
-	rejectedMsg := formatRejectedMsg(req)
+	rejectedMsg := formatRejectedMsg(ctx, req)
 	s.updateAllPosts(req, rejectedMsg)
 	return nil
 }
@@ -584,38 +634,47 @@ func (s *BudgetService) getAndValidate(ctx context.Context, requestID string, ex
 		return nil, err
 	}
 	if req == nil {
-		return nil, fmt.Errorf("budget request not found")
+		return nil, fmt.Errorf(i18n.T(ctx, "budget.err.not_found"))
 	}
 	if req.RejectedAt != nil {
-		return nil, fmt.Errorf("request has been rejected")
+		return nil, fmt.Errorf(i18n.T(ctx, "budget.err.been_rejected"))
 	}
 	if req.CurrentStep != expectedStep {
-		return nil, fmt.Errorf("request is at step %d, expected step %d", req.CurrentStep, expectedStep)
+		return nil, fmt.Errorf(i18n.T(ctx, "budget.err.wrong_step", map[string]any{
+			"Current": fmt.Sprintf("%d", req.CurrentStep), "Expected": fmt.Sprintf("%d", expectedStep),
+		}))
 	}
 	return req, nil
 }
 
-func formatBudgetInfo(req *model.BudgetRequest) string {
-	return fmt.Sprintf("#### Budget Request\n| | |\n|:--|:--|\n| **Name** | %s |\n| **Partner** | %s |\n| **Amount** | %s |\n| **Purpose** | %s |\n| **Deadline** | %s |",
-		req.Name, req.Partner, req.Amount, req.Purpose, req.Deadline)
+func formatBudgetInfo(ctx context.Context, req *model.BudgetRequest) string {
+	return fmt.Sprintf("%s\n| | |\n|:--|:--|\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |",
+		i18n.T(ctx, "budget.header"),
+		i18n.T(ctx, "budget.info.name"), req.Name,
+		i18n.T(ctx, "budget.info.partner"), req.Partner,
+		i18n.T(ctx, "budget.info.amount"), req.Amount,
+		i18n.T(ctx, "budget.info.purpose"), req.Purpose,
+		i18n.T(ctx, "budget.info.deadline"), req.Deadline)
 }
 
-func formatBudgetStatus(req *model.BudgetRequest, statusLabel string) string {
-	return formatBudgetInfo(req) + fmt.Sprintf("\n| **Status** | %s |", statusLabel)
+func formatBudgetStatus(ctx context.Context, req *model.BudgetRequest, statusLabel string) string {
+	return formatBudgetInfo(ctx, req) + fmt.Sprintf("\n| %s | %s |", i18n.T(ctx, "budget.info.status"), statusLabel)
 }
 
-func formatCompletedMsg(req *model.BudgetRequest) string {
-	msg := formatBudgetInfo(req)
-	msg += fmt.Sprintf("\n| **Transaction Code** | %s |", req.TransactionCode)
+func formatCompletedMsg(ctx context.Context, req *model.BudgetRequest) string {
+	msg := formatBudgetInfo(ctx, req)
+	msg += fmt.Sprintf("\n| %s | %s |", i18n.T(ctx, "budget.info.transaction_code"), req.TransactionCode)
 	if req.BillURL != "" {
-		msg += fmt.Sprintf("\n| **Bill** | %s |", req.BillURL)
+		msg += fmt.Sprintf("\n| %s | %s |", i18n.T(ctx, "budget.info.bill"), req.BillURL)
 	}
-	msg += "\n| **Status** | **COMPLETED** |"
+	msg += fmt.Sprintf("\n| %s | %s |", i18n.T(ctx, "budget.info.status"), i18n.T(ctx, "budget.status.completed"))
 	return msg
 }
 
-func formatRejectedMsg(req *model.BudgetRequest) string {
-	return formatBudgetInfo(req) + fmt.Sprintf("\n| **Status** | **REJECTED** at step %d |", req.CurrentStep)
+func formatRejectedMsg(ctx context.Context, req *model.BudgetRequest) string {
+	return formatBudgetInfo(ctx, req) + fmt.Sprintf("\n| %s | %s |",
+		i18n.T(ctx, "budget.info.status"),
+		i18n.T(ctx, "budget.status.rejected", map[string]any{"Step": fmt.Sprintf("%d", req.CurrentStep)}))
 }
 
 // userMention returns a @username mention for a user ID, falling back to @all on error.
@@ -628,4 +687,12 @@ func (s *BudgetService) userMention(userID string) string {
 		return "@all"
 	}
 	return "@" + user.Username
+}
+
+// extractUsername removes the "@" prefix from a mention string
+func (s *BudgetService) extractUsername(mention string) string {
+	if len(mention) > 0 && mention[0] == '@' {
+		return mention[1:]
+	}
+	return mention
 }

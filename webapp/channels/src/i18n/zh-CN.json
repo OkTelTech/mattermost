@@ -6786,5 +6786,20 @@
   "error.magic_link_already_logged_in.message": "您已登录。请先登出后再试。",
   "error.magic_link_already_logged_in.title": "无法使用魔法链接登录",
   "global_header.productChannels": "频道",
-  "plugin.upload": "语音消息"
+  "plugin.upload": "语音消息",
+  "budget.msg.request_created": "新预算申请：{Name} 来自 {Partner}，金额 {Amount}",
+  "budget.msg.partner_fill_content": "请为申请填写内容：{Name} 来自 {Partner}，金额 {Amount}",
+  "budget.msg.partner_resubmit": "@{Username} 请重新提交内容",
+  "budget.msg.fill_payment": "@{Username} 请填写付款信息",
+  "budget.msg.content_returned": "内容由 @{Username} 退回。原因：{Reason}",
+  "budget.msg.approval_review": "需要审批预算申请：{Name} 来自 {Partner}，金额 {Amount}",
+  "budget.msg.finance_complete": "预算申请已完成：{Name} 来自 {Partner}，金额 {Amount}",
+  "attendance.msg.checked_in": "@{Username} 于 {Time} 签到",
+  "attendance.msg.break_start": "@{Username} 于 {Time} 开始休息。原因：{Reason}",
+  "attendance.msg.break_end": "@{Username} 于 {Time} 结束休息",
+  "attendance.msg.checked_out": "@{Username} 于 {Time} 签退",
+  "attendance.msg.approved": "@{Username} 您的休假申请已被 {Approver} 批准",
+  "attendance.msg.rejected": "@{Username} 您的休假申请已被 {Approver} 拒绝",
+  "leave.msg.request_info": "休假申请：{LeaveType} 来自 {Username}。日期：{Dates}。原因：{Reason}。预计时间：{ExpectedTime}。状态：{Status}",
+  "leave.msg.request_approval": "休假申请审批：{LeaveType} 来自 {Username}。日期：{Dates}。原因：{Reason}。预计时间：{ExpectedTime}。状态：{Status}"
 }

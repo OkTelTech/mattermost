@@ -5193,5 +5193,20 @@
   "user_settings.notifications.test_notification.send_button.send": "Gửi thông báo thử nghiệm",
   "user_settings.notifications.test_notification.title": "Khắc phục sự cố thông báo",
   "userSettingsModal.pluginPreferences.header": "TÙY CHỌN PLUGIN",
-  "plugin.upload": "Tin nhắn thoại"
+  "plugin.upload": "Tin nhắn thoại",
+  "budget.msg.request_created": "Yêu cầu ngân sách mới: {Name} từ {Partner} cho {Amount}",
+  "budget.msg.partner_fill_content": "Vui lòng điền nội dung cho yêu cầu: {Name} từ {Partner} cho {Amount}",
+  "budget.msg.partner_resubmit": "@{Username} vui lòng gửi lại nội dung",
+  "budget.msg.fill_payment": "@{Username} vui lòng điền thông tin thanh toán",
+  "budget.msg.content_returned": "Nội dung được trả lại bởi @{Username}. Lý do: {Reason}",
+  "budget.msg.approval_review": "Cần phê duyệt yêu cầu ngân sách: {Name} từ {Partner} cho {Amount}",
+  "budget.msg.finance_complete": "Yêu cầu ngân sách hoàn thành: {Name} từ {Partner} cho {Amount}",
+  "attendance.msg.checked_in": "@{Username} đã check in lúc {Time}",
+  "attendance.msg.break_start": "@{Username} bắt đầu nghỉ lúc {Time}. Lý do: {Reason}",
+  "attendance.msg.break_end": "@{Username} kết thúc nghỉ lúc {Time}",
+  "attendance.msg.checked_out": "@{Username} đã check out lúc {Time}",
+  "attendance.msg.approved": "@{Username} yêu cầu nghỉ phép của bạn đã được {Approver} phê duyệt",
+  "attendance.msg.rejected": "@{Username} yêu cầu nghỉ phép của bạn đã bị {Approver} từ chối",
+  "leave.msg.request_info": "Yêu cầu nghỉ phép: {LeaveType} từ {Username}. Ngày: {Dates}. Lý do: {Reason}. Thời gian dự kiến: {ExpectedTime}. Trạng thái: {Status}",
+  "leave.msg.request_approval": "Phê duyệt yêu cầu nghỉ phép: {LeaveType} từ {Username}. Ngày: {Dates}. Lý do: {Reason}. Thời gian dự kiến: {ExpectedTime}. Trạng thái: {Status}"
 }

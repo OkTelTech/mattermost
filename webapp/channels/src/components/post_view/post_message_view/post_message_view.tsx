@@ -89,10 +89,13 @@ class PostMessageView extends React.PureComponent<Props, State> {
             const messageKey = post.props.message_key;
             const messageData = post.props.message_data as Record<string, any>;
 
-            // Format time values from Unix timestamp to user's locale
             const formattedData = {...messageData};
+
+            // Extract non-template keys before ICU formatting
+            const fileID = formattedData.FileID;
+            delete formattedData.FileID;
+
             if (formattedData.Time && typeof formattedData.Time === 'number') {
-                // Convert Unix timestamp (seconds) to milliseconds
                 const timeDate = new Date(formattedData.Time * 1000);
                 formattedData.Time = this.props.intl.formatTime(timeDate, {
                     hour: '2-digit',
@@ -103,11 +106,14 @@ class PostMessageView extends React.PureComponent<Props, State> {
             }
 
             try {
-                // Use the intl.formatMessage to translate
-                return this.props.intl.formatMessage(
+                let translated = this.props.intl.formatMessage(
                     {id: messageKey, defaultMessage: post.message},
-                    formattedData
+                    formattedData,
                 );
+                if (fileID) {
+                    translated += `\n\n![photo](/api/v4/files/${fileID}/preview)`;
+                }
+                return translated;
             } catch (e) {
                 // If translation fails, fall back to original message
                 console.warn(`Failed to translate message key: ${messageKey}`, e);

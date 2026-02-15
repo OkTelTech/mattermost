@@ -163,19 +163,21 @@ func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	ctx := h.localeCtx(r.Context(), req.UserID)
+
 	err := h.mm.OpenDialog(&mattermost.DialogRequest{
 		TriggerID: req.TriggerID,
 		URL:       h.botURL + "/api/attendance/checkin-submit",
 		Dialog: mattermost.Dialog{
-			Title:       "Check In",
-			SubmitLabel: "Check In",
+			Title:       i18n.T(ctx, "attendance.dialog.checkin_title"),
+			SubmitLabel: i18n.T(ctx, "attendance.dialog.checkin_submit"),
 			Elements: []mattermost.DialogElement{
 				{
-					DisplayName: "Photo",
+					DisplayName: i18n.T(ctx, "attendance.field.photo"),
 					Name:        "photo",
 					Type:        "file",
 					Optional:    true,
-					HelpText:    "Attach a photo to your check-in (optional)",
+					HelpText:    i18n.T(ctx, "attendance.helptext.photo"),
 					Accept:      "image/*",
 				},
 			},
@@ -183,7 +185,7 @@ func (h *AttendanceHandler) HandleCheckIn(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		log.Printf("ERROR open check-in dialog: %v", err)
-		writeJSON(w, ActionResponse{EphemeralText: "Failed to open check-in form. Please try again."})
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.open_form")})
 		return
 	}
 	writeJSON(w, ActionResponse{})
@@ -202,6 +204,7 @@ func (h *AttendanceHandler) HandleCheckInSubmit(w http.ResponseWriter, r *http.R
 	}
 
 	username := sub.UserName
+	ctx := h.localeCtx(r.Context(), sub.UserID)
 	if username == "" {
 		user, err := h.mm.GetUser(sub.UserID)
 		if err == nil {
@@ -211,7 +214,7 @@ func (h *AttendanceHandler) HandleCheckInSubmit(w http.ResponseWriter, r *http.R
 
 	fileID := sub.Submission["photo"]
 
-	result, err := h.svc.CheckIn(r.Context(), sub.UserID, username, sub.ChannelID, fileID)
+	result, err := h.svc.CheckIn(ctx, sub.UserID, username, sub.ChannelID, fileID)
 	if err != nil {
 		log.Printf("ERROR check-in: %v", err)
 		writeJSON(w, map[string]string{"error": err.Error()})

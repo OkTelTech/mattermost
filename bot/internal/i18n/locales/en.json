@@ -11,6 +11,10 @@
   "attendance.btn.early": "Early Departure",
   "attendance.btn.approve": "Approve",
   "attendance.btn.reject": "Reject",
+  "attendance.dialog.checkin_title": "Check In",
+  "attendance.dialog.checkin_submit": "Check In",
+  "attendance.field.photo": "Photo",
+  "attendance.helptext.photo": "Attach a photo to your check-in (optional)",
   "attendance.dialog.break_title": "Start Break",
   "attendance.dialog.break_submit": "Start",
   "attendance.dialog.leave_title": "Leave Request",
@@ -35,6 +39,7 @@
   "attendance.err.open_form": "Failed to open form. Please try again.",
   "attendance.err.missing_id": "Missing request ID",
 
+  "attendance.msg.checked_in": "@{{.Username}} checked in at {{.Time}}",
   "attendance.msg.already_checked_in": "@{{.Username}} already checked in today at {{.Time}}",
   "attendance.msg.not_checked_in": "@{{.Username}} has not checked in today",
   "attendance.msg.already_on_break": "@{{.Username}} is already on break",

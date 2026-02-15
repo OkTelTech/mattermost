@@ -63,13 +63,23 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		return nil, fmt.Errorf("create record: %w", err)
 	}
 
-	msg := fmt.Sprintf("@%s checked in", username)
+	msg := "@" + username
+	msgData := map[string]any{
+		"Username": username,
+		"Time":     now.Unix(),
+	}
 	if fileID != "" {
-		// Embed the user-uploaded image via markdown (no re-upload needed)
-		msg += fmt.Sprintf("\n\n![check-in photo](/api/v4/files/%s/preview)", fileID)
+		msgData["FileID"] = fileID
 		record.CheckInImageID = fileID
 	}
-	postReq := &mattermost.Post{ChannelID: channelID, Message: msg}
+	postReq := &mattermost.Post{
+		ChannelID: channelID,
+		Message:   msg,
+		Props: mattermost.Props{
+			MessageKey:  "attendance.msg.checked_in",
+			MessageData: msgData,
+		},
+	}
 
 	post, err := s.mm.CreatePost(postReq)
 	if err != nil {

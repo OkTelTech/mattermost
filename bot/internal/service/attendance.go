@@ -155,20 +155,24 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 	// Close the last open break
 	last := &record.Breaks[len(record.Breaks)-1]
 	last.End = &now
+	breakDuration := now.Sub(last.Start)
 	record.Status = model.AttendanceStatusWorking
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
 		return "", err
 	}
 
+	msgData := map[string]any{
+		"Username": username,
+		"Reason":   last.Reason,
+		"Duration": formatDuration(ctx, breakDuration),
+	}
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: record.ChannelID,
 		RootID:    record.PostID,
-		Message:   "@" + username,
+		Message:   i18n.T(ctx, "attendance.msg.break_end", msgData),
 		Props: mattermost.Props{
-			MessageKey: "attendance.msg.break_end",
-			MessageData: map[string]any{
-				"Username": username,
-			},
+			MessageKey:  "attendance.msg.break_end",
+			MessageData: msgData,
 		},
 	})
 	return fmt.Sprintf("%s ended break at %s", username, now.Format(time.TimeOnly)), nil
@@ -185,6 +189,9 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	if record == nil {
 		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.not_checked_in", map[string]any{"Username": username}))
 	}
+	if record.Status == model.AttendanceStatusBreak {
+		return "", fmt.Errorf(i18n.T(ctx, "attendance.err.must_end_break", map[string]any{"Username": username}))
+	}
 	if record.CheckOut != nil {
 		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_out", map[string]any{
 			"Username": username, "Time": record.CheckOut.Format(time.TimeOnly),
@@ -197,25 +204,44 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		return "", err
 	}
 
-	// Calculate total break time
+	// Calculate total break time and build break details
 	var totalBreak time.Duration
-	for _, b := range record.Breaks {
+	var breakLines []string
+	for idx, b := range record.Breaks {
 		end := now
 		if b.End != nil {
 			end = *b.End
 		}
-		totalBreak += end.Sub(b.Start)
+		dur := end.Sub(b.Start)
+		totalBreak += dur
+		breakLines = append(breakLines, fmt.Sprintf("%d. %s — %s",
+			idx+1, b.Reason, formatDuration(ctx, dur),
+		))
 	}
 
+	totalTime := now.Sub(*record.CheckIn)
+	actualWork := totalTime - totalBreak
+
+	breakList := ""
+	if len(breakLines) > 0 {
+		breakList = strings.Join(breakLines, "\n") + "\n"
+	}
+
+	msgData := map[string]any{
+		"Username":       username,
+		"TotalTime":      formatDuration(ctx, totalTime),
+		"ActualWorkTime": formatDuration(ctx, actualWork),
+		"TotalBreakTime": formatDuration(ctx, totalBreak),
+		"BreakCount":     len(record.Breaks),
+		"BreakList":      breakList,
+	}
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: record.ChannelID,
 		RootID:    record.PostID,
-		Message:   "@" + username,
+		Message:   i18n.T(ctx, "attendance.msg.checked_out", msgData),
 		Props: mattermost.Props{
-			MessageKey: "attendance.msg.checked_out",
-			MessageData: map[string]any{
-				"Username": username,
-			},
+			MessageKey:  "attendance.msg.checked_out",
+			MessageData: msgData,
 		},
 	})
 	return fmt.Sprintf("%s checked out at %s", username, now.Format(time.TimeOnly)), nil
@@ -521,5 +547,24 @@ func leaveMessageData(username string, leaveType model.LeaveType, dates []string
 		"ExpectedTime": timeStr,
 		"Status":       status,
 	}
+}
+
+func formatDuration(ctx context.Context, d time.Duration) string {
+	d = d.Round(time.Second)
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	var parts []string
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%d %s", h, i18n.T(ctx, "duration.h")))
+	}
+	if m > 0 {
+		parts = append(parts, fmt.Sprintf("%d %s", m, i18n.T(ctx, "duration.m")))
+	}
+	if s > 0 || len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%d %s", s, i18n.T(ctx, "duration.s")))
+	}
+	return strings.Join(parts, " ")
 }
 

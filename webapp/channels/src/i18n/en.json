@@ -6812,6 +6812,9 @@
   "leave.msg.leave": "#### Leave Request\n| | |\n|:--|:--|\n| **User** | @{Username} |\n| **Dates** | {Dates} |\n| **Reason** | {Reason} |\n| **Status** | {Status} |",
   "leave.msg.late": "#### Late Arrival Request\n| | |\n|:--|:--|\n| **User** | @{Username} |\n| **Date** | {Dates} |\n| **Expected Arrival** | {ExpectedTime} |\n| **Reason** | {Reason} |\n| **Status** | {Status} |",
   "leave.msg.early": "#### Early Departure Request\n| | |\n|:--|:--|\n| **User** | @{Username} |\n| **Date** | {Dates} |\n| **Expected Departure** | {ExpectedTime} |\n| **Reason** | {Reason} |\n| **Status** | {Status} |",
+  "leave.msg.change_leave": "#### Leave Request - Date Change\n| | |\n|:--|:--|\n| **User** | @{Username} |\n| **Original Date** | ~~{OldDate}~~ |\n| **New Date** | {NewDate} |\n| **Reason** | {Reason} |\n| **Change Reason** | {ChangeReason} |\n| **Status** | {Status} |",
+  "attendance.msg.change_approved": "@{Username} your date change request has been approved by @{Approver}",
+  "attendance.msg.change_rejected": "@{Username} your date change request has been rejected by @{Approver}\n> {Reason}",
   "leave.type.leave": "Annual Leave",
   "leave.type.emergency": "Emergency Leave",
   "leave.type.sick": "Sick Leave",
@@ -6819,5 +6822,6 @@
   "leave.type.early_departure": "Early Departure",
   "leave.status.pending": "Pending",
   "leave.status.approved": "**APPROVED**",
-  "leave.status.rejected": "**REJECTED**"
+  "leave.status.rejected": "**REJECTED**",
+  "leave.status.pending_change": "**PENDING CHANGE**"
 }

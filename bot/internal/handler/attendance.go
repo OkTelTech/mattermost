@@ -3,9 +3,11 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
@@ -148,6 +150,10 @@ func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Re
 					{Name: i18n.T(ctx, "attendance.btn.early"), Type: "button", Integration: mattermost.Integration{
 						URL:     h.botURL + "/api/attendance/early-form",
 						Context: map[string]any{"action": "early-form"},
+					}},
+					{Name: i18n.T(ctx, "attendance.btn.change_dates"), Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/change-form",
+						Context: map[string]any{"action": "change-form"},
 					}},
 				},
 			},
@@ -691,6 +697,261 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
+// HandleChangeDatesForm opens the change dates dialog.
+func (h *AttendanceHandler) HandleChangeDatesForm(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.localeCtx(r.Context(), req.UserID)
+
+	leaves, err := h.svc.GetUserFutureLeaves(ctx, req.UserID)
+	if err != nil {
+		log.Printf("ERROR get future leaves: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.open_form")})
+		return
+	}
+
+	// Build options: each option is one future date from a leave request
+	today := time.Now().Format(time.DateOnly)
+	var options []mattermost.SelectOption
+	for _, l := range leaves {
+		for _, d := range l.Dates {
+			if d < today {
+				continue
+			}
+			label := fmt.Sprintf("%s - %s (%s)",
+				i18n.T(ctx, leaveTypeI18nKey(l.Type)),
+				d,
+				i18n.T(ctx, leaveStatusI18nKey(l.Status)),
+			)
+			options = append(options, mattermost.SelectOption{
+				Text:  label,
+				Value: l.ID.Hex() + ":" + d,
+			})
+		}
+	}
+
+	if len(options) == 0 {
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.no_future_leaves")})
+		return
+	}
+
+	err = h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/change-submit",
+		Dialog: mattermost.Dialog{
+			Title:       i18n.T(ctx, "attendance.dialog.change_title"),
+			SubmitLabel: i18n.T(ctx, "attendance.dialog.submit"),
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: i18n.T(ctx, "attendance.field.select_date"),
+					Name:        "old_date",
+					Type:        "select",
+					Options:     options,
+				},
+				{
+					DisplayName: i18n.T(ctx, "attendance.field.new_date"),
+					Name:        "new_date",
+					Type:        "text",
+					SubType:     "date",
+				},
+				{
+					DisplayName: i18n.T(ctx, "attendance.field.change_reason"),
+					Name:        "change_reason",
+					Type:        "textarea",
+					Placeholder: i18n.T(ctx, "attendance.placeholder.change_reason"),
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("ERROR open change dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.open_form")})
+		return
+	}
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleChangeDatesSubmit processes the change dates dialog submission.
+func (h *AttendanceHandler) HandleChangeDatesSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+
+	// Value is "requestID:oldDate"
+	selection := sub.Submission["old_date"]
+	parts := strings.SplitN(selection, ":", 2)
+	if len(parts) != 2 {
+		writeJSON(w, map[string]string{"error": i18n.T(ctx, "attendance.err.missing_id")})
+		return
+	}
+	leaveID := parts[0]
+	oldDate := parts[1]
+
+	newDate := strings.TrimSpace(sub.Submission["new_date"])
+	changeReason := sub.Submission["change_reason"]
+
+	err := h.svc.RequestDateChange(ctx, leaveID, sub.UserID, oldDate, newDate, changeReason)
+	if err != nil {
+		log.Printf("ERROR change dates: %v", err)
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// HandleChangeApprove handles the approve button click for a date change.
+func (h *AttendanceHandler) HandleChangeApprove(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.localeCtx(r.Context(), req.UserID)
+
+	requestID, _ := req.Context["request_id"].(string)
+	if requestID == "" {
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.missing_id")})
+		return
+	}
+
+	result, err := h.svc.ApproveDateChange(ctx, requestID, req.UserID, req.UserName)
+	if err != nil {
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
+		return
+	}
+
+	writeJSON(w, ActionResponse{
+		Update: &ActionUpdate{
+			Props: &mattermost.Props{
+				MessageKey:  result.MessageKey,
+				MessageData: result.MessageData,
+				Attachments: []mattermost.Attachment{},
+			},
+		},
+	})
+}
+
+// HandleChangeReject opens a dialog asking for the change rejection reason.
+func (h *AttendanceHandler) HandleChangeReject(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.localeCtx(r.Context(), req.UserID)
+
+	requestID, _ := req.Context["request_id"].(string)
+	if requestID == "" {
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.missing_id")})
+		return
+	}
+
+	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+		TriggerID: req.TriggerID,
+		URL:       h.botURL + "/api/attendance/change-reject-submit",
+		Dialog: mattermost.Dialog{
+			CallbackID:  requestID,
+			Title:       i18n.T(ctx, "attendance.dialog.reject_change_title"),
+			SubmitLabel: i18n.T(ctx, "attendance.dialog.reject_submit"),
+			Elements: []mattermost.DialogElement{
+				{
+					DisplayName: i18n.T(ctx, "attendance.field.reason"),
+					Name:        "reason",
+					Type:        "textarea",
+					Placeholder: i18n.T(ctx, "attendance.placeholder.reject"),
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("ERROR open change reject dialog: %v", err)
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.open_form")})
+		return
+	}
+	writeJSON(w, ActionResponse{})
+}
+
+// HandleChangeRejectSubmit processes the change rejection dialog submission.
+func (h *AttendanceHandler) HandleChangeRejectSubmit(w http.ResponseWriter, r *http.Request) {
+	var sub DialogSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if sub.Cancelled {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	requestID := sub.CallbackID
+	if requestID == "" {
+		writeJSON(w, map[string]string{"error": "Missing request ID"})
+		return
+	}
+
+	ctx := h.localeCtx(r.Context(), sub.UserID)
+
+	username := sub.UserName
+	if username == "" {
+		user, err := h.mm.GetUser(sub.UserID)
+		if err == nil {
+			username = user.Username
+		}
+	}
+
+	err := h.svc.RejectDateChange(ctx, requestID, sub.UserID, username, sub.Submission["reason"])
+	if err != nil {
+		log.Printf("ERROR reject date change: %v", err)
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func leaveTypeI18nKey(lt model.LeaveType) string {
+	switch lt {
+	case model.LeaveTypeAnnual:
+		return "leave.type.annual"
+	case model.LeaveTypeEmergency:
+		return "leave.type.emergency"
+	case model.LeaveTypeSick:
+		return "leave.type.sick"
+	case model.LeaveTypeLateArrival:
+		return "leave.type.late"
+	case model.LeaveTypeEarlyDeparture:
+		return "leave.type.early"
+	default:
+		return "leave.type.annual"
+	}
+}
+
+func leaveStatusI18nKey(s model.LeaveStatus) string {
+	switch s {
+	case model.LeaveStatusPending:
+		return "leave.status.pending"
+	case model.LeaveStatusApproved:
+		return "leave.status.approved"
+	default:
+		return "leave.status.pending"
+	}
+}
+
 // RegisterRoutes registers all attendance routes on the given mux.
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
@@ -709,6 +970,11 @@ func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance/approve", h.HandleApprove)
 	mux.HandleFunc("POST /api/attendance/reject", h.HandleReject)
 	mux.HandleFunc("POST /api/attendance/reject-submit", h.HandleRejectSubmit)
+	mux.HandleFunc("POST /api/attendance/change-form", h.HandleChangeDatesForm)
+	mux.HandleFunc("POST /api/attendance/change-submit", h.HandleChangeDatesSubmit)
+	mux.HandleFunc("POST /api/attendance/change-approve", h.HandleChangeApprove)
+	mux.HandleFunc("POST /api/attendance/change-reject", h.HandleChangeReject)
+	mux.HandleFunc("POST /api/attendance/change-reject-submit", h.HandleChangeRejectSubmit)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

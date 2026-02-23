@@ -5210,6 +5210,9 @@
   "leave.msg.leave": "#### Yêu cầu nghỉ phép\n| | |\n|:--|:--|\n| **Nhân viên** | @{Username} |\n| **Ngày nghỉ** | {Dates} |\n| **Lý do** | {Reason} |\n| **Trạng thái** | {Status} |",
   "leave.msg.late": "#### Yêu cầu đi muộn\n| | |\n|:--|:--|\n| **Nhân viên** | @{Username} |\n| **Ngày** | {Dates} |\n| **Giờ đến dự kiến** | {ExpectedTime} |\n| **Lý do** | {Reason} |\n| **Trạng thái** | {Status} |",
   "leave.msg.early": "#### Yêu cầu về sớm\n| | |\n|:--|:--|\n| **Nhân viên** | @{Username} |\n| **Ngày** | {Dates} |\n| **Giờ về dự kiến** | {ExpectedTime} |\n| **Lý do** | {Reason} |\n| **Trạng thái** | {Status} |",
+  "leave.msg.change_leave": "#### Yêu cầu nghỉ phép - Đổi ngày\n| | |\n|:--|:--|\n| **Nhân viên** | @{Username} |\n| **Ngày cũ** | ~~{OldDate}~~ |\n| **Ngày mới** | {NewDate} |\n| **Lý do** | {Reason} |\n| **Lý do thay đổi** | {ChangeReason} |\n| **Trạng thái** | {Status} |",
+  "attendance.msg.change_approved": "@{Username} yêu cầu đổi ngày của bạn đã được @{Approver} phê duyệt",
+  "attendance.msg.change_rejected": "@{Username} yêu cầu đổi ngày của bạn đã bị @{Approver} từ chối\n> {Reason}",
   "leave.type.leave": "Nghỉ phép năm",
   "leave.type.emergency": "Nghỉ khẩn cấp",
   "leave.type.sick": "Nghỉ ốm",
@@ -5217,5 +5220,6 @@
   "leave.type.early_departure": "Về sớm",
   "leave.status.pending": "Chờ duyệt",
   "leave.status.approved": "**ĐÃ DUYỆT**",
-  "leave.status.rejected": "**ĐÃ TỪ CHỐI**"
+  "leave.status.rejected": "**ĐÃ TỪ CHỐI**",
+  "leave.status.pending_change": "**CHỜ DUYỆT THAY ĐỔI**"
 }

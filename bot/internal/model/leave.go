@@ -19,9 +19,10 @@ const (
 type LeaveStatus string
 
 const (
-	LeaveStatusPending  LeaveStatus = "pending"
-	LeaveStatusApproved LeaveStatus = "approved"
-	LeaveStatusRejected LeaveStatus = "rejected"
+	LeaveStatusPending       LeaveStatus = "pending"
+	LeaveStatusApproved      LeaveStatus = "approved"
+	LeaveStatusRejected      LeaveStatus = "rejected"
+	LeaveStatusPendingChange LeaveStatus = "pending_change"
 )
 
 type LeaveRequest struct {
@@ -41,7 +42,13 @@ type LeaveRequest struct {
 	ApproverID        string        `bson:"approver_id,omitempty" json:"approver_id"`
 	ApproverUsername  string        `bson:"approver_username,omitempty" json:"approver_username"`
 	ApprovedAt        *time.Time    `bson:"approved_at,omitempty" json:"approved_at"`
-	RejectReason      string        `bson:"reject_reason,omitempty" json:"reject_reason"`
-	CreatedAt         time.Time     `bson:"created_at" json:"created_at"`
-	UpdatedAt         time.Time     `bson:"updated_at" json:"updated_at"`
+	RejectReason         string        `bson:"reject_reason,omitempty" json:"reject_reason"`
+	OldDate              string        `bson:"old_date,omitempty" json:"old_date,omitempty"`
+	NewDate              string        `bson:"new_date,omitempty" json:"new_date,omitempty"`
+	ChangeReason         string        `bson:"change_reason,omitempty" json:"change_reason,omitempty"`
+	PreviousStatus       LeaveStatus   `bson:"previous_status,omitempty" json:"previous_status,omitempty"`
+	ChangePostID         string        `bson:"change_post_id,omitempty" json:"change_post_id,omitempty"`
+	ChangeApprovalPostID string        `bson:"change_approval_post_id,omitempty" json:"change_approval_post_id,omitempty"`
+	CreatedAt            time.Time     `bson:"created_at" json:"created_at"`
+	UpdatedAt            time.Time     `bson:"updated_at" json:"updated_at"`
 }

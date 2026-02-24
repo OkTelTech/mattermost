@@ -26,9 +26,9 @@ Bot chấm công nội bộ tích hợp với Mattermost, hỗ trợ check-in/ou
 
 > **Lưu ý**: Bot phải được add vào team trước khi có thể add vào các channels trong team đó.
 
-#### A2. Tạo Slash Command `/attendance`
+#### A2. Tạo Slash Command `/diemdanh`
 
-Slash command cho phép nhân viên gõ `/attendance` để mở menu chấm công.
+Slash command cho phép nhân viên gõ `/diemdanh` để mở menu chấm công.
 
 1. Vào **Main Menu** (☰) → **Integrations**
 2. Chọn **Slash Commands** → **Add Slash Command**
@@ -38,8 +38,8 @@ Slash command cho phép nhân viên gõ `/attendance` để mở menu chấm cô
 |-------|---------|
 | **Title** | Attendance |
 | **Description** | Chấm công và xin nghỉ phép |
-| **Command Trigger Word** | `attendance` |
-| **Request URL** | `http://bot-service:3000/api/attendance` |
+| **Command Trigger Word** | `diemdanh` |
+| **Request URL** | `http://bot-service:3000/api/diemdanh` |
 | **Request Method** | POST |
 | **Autocomplete** | ✓ Bật |
 | **Autocomplete Hint** | (để trống) |

@@ -153,8 +153,8 @@ func (h *AttendanceHandler) HandleDiemDanh(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-// HandleXinNghi handles /xinnghi slash command (leave/late/early requests).
-func (h *AttendanceHandler) HandleXinNghi(w http.ResponseWriter, r *http.Request) {
+// HandleXinPhep handles /xinphep slash command (leave/late/early requests).
+func (h *AttendanceHandler) HandleXinPhep(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -689,7 +689,7 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 // RegisterRoutes registers all attendance routes on the given mux.
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/diemdanh", h.HandleDiemDanh)
-	mux.HandleFunc("POST /api/xinnghi", h.HandleXinNghi)
+	mux.HandleFunc("POST /api/xinphep", h.HandleXinPhep)
 	mux.HandleFunc("POST /api/attendance/checkin", h.HandleCheckIn)
 	mux.HandleFunc("POST /api/attendance/checkin-submit", h.HandleCheckInSubmit)
 	mux.HandleFunc("POST /api/attendance/break-start", h.HandleBreakStart)

@@ -276,9 +276,8 @@ func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Requ
 	ctx := h.localeCtx(r.Context(), req.UserID)
 
 	reasonKey, _ := req.Context["reason"].(string)
-	displayReason := i18n.T(ctx, "attendance.break_reason."+reasonKey)
 
-	msg, err := h.svc.BreakStart(ctx, req.UserID, req.UserName, displayReason)
+	msg, err := h.svc.BreakStart(ctx, req.UserID, req.UserName, reasonKey)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return

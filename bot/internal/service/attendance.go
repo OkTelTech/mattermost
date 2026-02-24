@@ -161,18 +161,23 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 		return "", err
 	}
 
-	msgData := map[string]any{
+	displayReason := i18n.T(ctx, "attendance.break_reason."+last.Reason)
+	fallbackData := map[string]any{
 		"Username": username,
-		"Reason":   last.Reason,
+		"Reason":   displayReason,
 		"Duration": formatDuration(ctx, breakDuration),
 	}
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: record.ChannelID,
 		RootID:    record.PostID,
-		Message:   i18n.T(ctx, "attendance.msg.break_end", msgData),
+		Message:   i18n.T(ctx, "attendance.msg.break_end", fallbackData),
 		Props: mattermost.Props{
-			MessageKey:  "attendance.msg.break_end",
-			MessageData: msgData,
+			MessageKey: "attendance.msg.break_end",
+			MessageData: map[string]any{
+				"Username": username,
+				"Reason":   last.Reason,
+				"Duration": int(breakDuration.Round(time.Second).Seconds()),
+			},
 		},
 	})
 	return fmt.Sprintf("%s ended break at %s", username, now.Format(time.TimeOnly)), nil
@@ -207,6 +212,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	// Calculate total break time and build break details
 	var totalBreak time.Duration
 	var breakLines []string
+	var breaksData []map[string]any
 	for idx, b := range record.Breaks {
 		end := now
 		if b.End != nil {
@@ -214,9 +220,14 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		}
 		dur := end.Sub(b.Start)
 		totalBreak += dur
+		displayReason := i18n.T(ctx, "attendance.break_reason."+b.Reason)
 		breakLines = append(breakLines, fmt.Sprintf("%d. %s — %s",
-			idx+1, b.Reason, formatDuration(ctx, dur),
+			idx+1, displayReason, formatDuration(ctx, dur),
 		))
+		breaksData = append(breaksData, map[string]any{
+			"Reason":   b.Reason,
+			"Duration": int(dur.Round(time.Second).Seconds()),
+		})
 	}
 
 	totalTime := now.Sub(*record.CheckIn)
@@ -227,7 +238,8 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 		breakList = strings.Join(breakLines, "\n") + "\n"
 	}
 
-	msgData := map[string]any{
+	// Fallback Message with pre-translated strings
+	fallbackData := map[string]any{
 		"Username":       username,
 		"TotalTime":      formatDuration(ctx, totalTime),
 		"ActualWorkTime": formatDuration(ctx, actualWork),
@@ -238,10 +250,17 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	s.mm.CreatePost(&mattermost.Post{
 		ChannelID: record.ChannelID,
 		RootID:    record.PostID,
-		Message:   i18n.T(ctx, "attendance.msg.checked_out", msgData),
+		Message:   i18n.T(ctx, "attendance.msg.checked_out", fallbackData),
 		Props: mattermost.Props{
-			MessageKey:  "attendance.msg.checked_out",
-			MessageData: msgData,
+			MessageKey: "attendance.msg.checked_out",
+			MessageData: map[string]any{
+				"Username":       username,
+				"TotalTime":      int(totalTime.Round(time.Second).Seconds()),
+				"ActualWorkTime": int(actualWork.Round(time.Second).Seconds()),
+				"TotalBreakTime": int(totalBreak.Round(time.Second).Seconds()),
+				"BreakCount":     len(record.Breaks),
+				"Breaks":         breaksData,
+			},
 		},
 	})
 	return fmt.Sprintf("%s checked out at %s", username, now.Format(time.TimeOnly)), nil

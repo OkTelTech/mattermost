@@ -596,7 +596,7 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 	for _, req := range leaveReqs {
 		u := getUser(req.UserID, req.Username)
 		entry := LeaveEntry{
-			Type:         leaveTypeLabel(ctx, req.Type),
+			Type:         string(req.Type),
 			Dates:        req.Dates,
 			Reason:       req.Reason,
 			ExpectedTime: req.ExpectedTime,

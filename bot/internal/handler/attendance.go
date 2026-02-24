@@ -92,8 +92,8 @@ func (h *AttendanceHandler) localeCtx(ctx context.Context, userID string) contex
 	return i18n.WithLocale(ctx, user.Locale)
 }
 
-// HandleSlashCommand handles /attendance slash command.
-func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Request) {
+// HandleDiemDanh handles /diemdanh slash command (attendance check-in/out/break).
+func (h *AttendanceHandler) HandleDiemDanh(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -114,28 +114,67 @@ func (h *AttendanceHandler) HandleSlashCommand(w http.ResponseWriter, r *http.Re
 		ResponseType: "ephemeral",
 		Attachments: []mattermost.Attachment{
 			{
-				Text: i18n.T(ctx, "attendance.section.attendance"),
 				Actions: []mattermost.Action{
 					{Name: i18n.T(ctx, "attendance.btn.checkin"), Type: "button", Integration: mattermost.Integration{
 						URL:     h.botURL + "/api/attendance/checkin",
 						Context: map[string]any{"action": "checkin"},
 					}},
-					{Name: i18n.T(ctx, "attendance.btn.break"), Type: "button", Integration: mattermost.Integration{
-						URL:     h.botURL + "/api/attendance/break-start",
-						Context: map[string]any{"action": "break-start"},
-					}},
-					{Name: i18n.T(ctx, "attendance.btn.end_break"), Type: "button", Integration: mattermost.Integration{
-						URL:     h.botURL + "/api/attendance/break-end",
-						Context: map[string]any{"action": "break-end"},
-					}},
 					{Name: i18n.T(ctx, "attendance.btn.checkout"), Type: "button", Integration: mattermost.Integration{
 						URL:     h.botURL + "/api/attendance/checkout",
 						Context: map[string]any{"action": "checkout"},
 					}},
+					{Name: i18n.T(ctx, "attendance.btn.rest"), Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-start",
+						Context: map[string]any{"reason": "nghi_ngoi"},
+					}},
+					{Name: i18n.T(ctx, "attendance.btn.eat"), Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-start",
+						Context: map[string]any{"reason": "di_an"},
+					}},
+					{Name: i18n.T(ctx, "attendance.btn.restroom_s"), Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-start",
+						Context: map[string]any{"reason": "tieu_tien"},
+					}},
+					{Name: i18n.T(ctx, "attendance.btn.restroom_l"), Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-start",
+						Context: map[string]any{"reason": "dai_tien"},
+					}},
+					{Name: i18n.T(ctx, "attendance.btn.smoke"), Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-start",
+						Context: map[string]any{"reason": "hut_thuoc"},
+					}},
+					{Name: i18n.T(ctx, "attendance.btn.back_seat"), Type: "button", Integration: mattermost.Integration{
+						URL:     h.botURL + "/api/attendance/break-end",
+						Context: map[string]any{"action": "break-end"},
+					}},
 				},
 			},
+		},
+	})
+}
+
+// HandleXinPhep handles /xinphep slash command (leave/late/early requests).
+func (h *AttendanceHandler) HandleXinPhep(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.localeCtx(r.Context(), r.FormValue("user_id"))
+
+	channelName := r.FormValue("channel_name")
+	if !strings.HasPrefix(channelName, "attendance") {
+		writeJSON(w, SlashResponse{
+			ResponseType: "ephemeral",
+			Text:         i18n.T(ctx, "attendance.channel_error"),
+		})
+		return
+	}
+
+	writeJSON(w, SlashResponse{
+		ResponseType: "ephemeral",
+		Attachments: []mattermost.Attachment{
 			{
-				Text: i18n.T(ctx, "attendance.section.requests"),
 				Actions: []mattermost.Action{
 					{Name: i18n.T(ctx, "attendance.btn.leave"), Type: "button", Integration: mattermost.Integration{
 						URL:     h.botURL + "/api/attendance/leave-form",
@@ -225,7 +264,8 @@ func (h *AttendanceHandler) HandleCheckInSubmit(w http.ResponseWriter, r *http.R
 	w.WriteHeader(http.StatusOK)
 }
 
-// HandleBreakStart opens a dialog asking for break reason.
+// HandleBreakStart handles a direct break-start button click (no dialog).
+// The break reason is passed via req.Context["reason"] as a key (e.g. "di_an").
 func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Request) {
 	var req ActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -235,59 +275,14 @@ func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Requ
 
 	ctx := h.localeCtx(r.Context(), req.UserID)
 
-	err := h.mm.OpenDialog(&mattermost.DialogRequest{
-		TriggerID: req.TriggerID,
-		URL:       h.botURL + "/api/attendance/break",
-		Dialog: mattermost.Dialog{
-			Title:       i18n.T(ctx, "attendance.dialog.break_title"),
-			SubmitLabel: i18n.T(ctx, "attendance.dialog.break_submit"),
-			Elements: []mattermost.DialogElement{
-				{
-					DisplayName: i18n.T(ctx, "attendance.field.reason"),
-					Name:        "reason",
-					Type:        "text",
-					Placeholder: i18n.T(ctx, "attendance.placeholder.break"),
-				},
-			},
-		},
-	})
+	reasonKey, _ := req.Context["reason"].(string)
+
+	msg, err := h.svc.BreakStart(ctx, req.UserID, req.UserName, reasonKey)
 	if err != nil {
-		log.Printf("ERROR open break dialog: %v", err)
-		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "attendance.err.open_form")})
+		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
 	}
-	writeJSON(w, ActionResponse{})
-}
-
-// HandleBreakSubmit processes the break dialog submission.
-func (h *AttendanceHandler) HandleBreakSubmit(w http.ResponseWriter, r *http.Request) {
-	var sub DialogSubmission
-	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	if sub.Cancelled {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	username := sub.UserName
-	ctx := h.localeCtx(r.Context(), sub.UserID)
-	if username == "" {
-		user, err := h.mm.GetUser(sub.UserID)
-		if err == nil {
-			username = user.Username
-		}
-	}
-
-	msg, err := h.svc.BreakStart(ctx, sub.UserID, username, sub.Submission["reason"])
-	if err != nil {
-		log.Printf("ERROR break start: %v", err)
-		writeJSON(w, map[string]string{"error": err.Error()})
-		return
-	}
-	_ = msg
-	w.WriteHeader(http.StatusOK)
+	writeJSON(w, ActionResponse{EphemeralText: msg})
 }
 
 // HandleBreakEnd handles the break end button.
@@ -342,21 +337,24 @@ func (h *AttendanceHandler) HandleLeaveForm(w http.ResponseWriter, r *http.Reque
 			SubmitLabel: i18n.T(ctx, "attendance.dialog.submit"),
 			Elements: []mattermost.DialogElement{
 				{
-					DisplayName: i18n.T(ctx, "attendance.field.type"),
-					Name:        "leave_type",
-					Type:        "select",
-					Options: []mattermost.SelectOption{
-						{Text: i18n.T(ctx, "leave.option.annual"), Value: string(model.LeaveTypeAnnual)},
-						{Text: i18n.T(ctx, "leave.option.emergency"), Value: string(model.LeaveTypeEmergency)},
-						{Text: i18n.T(ctx, "leave.option.sick"), Value: string(model.LeaveTypeSick)},
-					},
+					DisplayName: i18n.T(ctx, "attendance.field.date1"),
+					Name:        "date1",
+					Type:        "text",
+					SubType:     "date",
 				},
 				{
-					DisplayName: i18n.T(ctx, "attendance.field.dates"),
-					Name:        "dates",
-					Type:        "textarea",
-					HelpText:    i18n.T(ctx, "attendance.helptext.dates"),
-					Placeholder: i18n.T(ctx, "attendance.placeholder.dates"),
+					DisplayName: i18n.T(ctx, "attendance.field.date2"),
+					Name:        "date2",
+					Type:        "text",
+					SubType:     "date",
+					Optional:    true,
+				},
+				{
+					DisplayName: i18n.T(ctx, "attendance.field.date3"),
+					Name:        "date3",
+					Type:        "text",
+					SubType:     "date",
+					Optional:    true,
 				},
 				{
 					DisplayName: i18n.T(ctx, "attendance.field.reason"),
@@ -389,11 +387,10 @@ func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Req
 
 	ctx := h.localeCtx(r.Context(), sub.UserID)
 
-	// Parse comma-separated dates
+	// Collect dates from individual fields
 	var dates []string
-	for _, d := range strings.Split(sub.Submission["dates"], ",") {
-		d = strings.TrimSpace(d)
-		if d != "" {
+	for _, key := range []string{"date1", "date2", "date3"} {
+		if d := strings.TrimSpace(sub.Submission[key]); d != "" {
 			dates = append(dates, d)
 		}
 	}
@@ -403,7 +400,7 @@ func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Req
 		sub.UserID,
 		sub.UserName,
 		sub.ChannelID,
-		model.LeaveType(sub.Submission["leave_type"]),
+		model.LeaveTypeAnnual,
 		dates,
 		sub.Submission["reason"],
 		"",
@@ -593,7 +590,7 @@ func (h *AttendanceHandler) HandleApprove(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	msg, err := h.svc.ApproveLeave(ctx, requestID, req.UserID, req.UserName)
+	result, err := h.svc.ApproveLeave(ctx, requestID, req.UserID, req.UserName)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
@@ -601,8 +598,11 @@ func (h *AttendanceHandler) HandleApprove(w http.ResponseWriter, r *http.Request
 
 	writeJSON(w, ActionResponse{
 		Update: &ActionUpdate{
-			Message: msg,
-			Props:   &mattermost.Props{Attachments: []mattermost.Attachment{}},
+			Props: &mattermost.Props{
+				MessageKey:  result.MessageKey,
+				MessageData: result.MessageData,
+				Attachments: []mattermost.Attachment{},
+			},
 		},
 	})
 }
@@ -676,7 +676,7 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	_, err := h.svc.RejectLeave(ctx, requestID, sub.UserID, username, sub.Submission["reason"])
+	err := h.svc.RejectLeave(ctx, requestID, sub.UserID, username, sub.Submission["reason"])
 	if err != nil {
 		log.Printf("ERROR reject leave: %v", err)
 		writeJSON(w, map[string]string{"error": err.Error()})
@@ -728,11 +728,11 @@ func (h *AttendanceHandler) HandleStats(w http.ResponseWriter, r *http.Request) 
 
 // RegisterRoutes registers all attendance routes on the given mux.
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/attendance", h.HandleSlashCommand)
+	mux.HandleFunc("POST /api/diemdanh", h.HandleDiemDanh)
+	mux.HandleFunc("POST /api/xinphep", h.HandleXinPhep)
 	mux.HandleFunc("POST /api/attendance/checkin", h.HandleCheckIn)
 	mux.HandleFunc("POST /api/attendance/checkin-submit", h.HandleCheckInSubmit)
 	mux.HandleFunc("POST /api/attendance/break-start", h.HandleBreakStart)
-	mux.HandleFunc("POST /api/attendance/break", h.HandleBreakSubmit)
 	mux.HandleFunc("POST /api/attendance/break-end", h.HandleBreakEnd)
 	mux.HandleFunc("POST /api/attendance/checkout", h.HandleCheckOut)
 	mux.HandleFunc("POST /api/attendance/leave-form", h.HandleLeaveForm)

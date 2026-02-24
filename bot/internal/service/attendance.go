@@ -293,7 +293,11 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 			}
 			overlap := findOverlap(dates, checkDates)
 			if len(overlap) > 0 {
-				return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": strings.Join(overlap, ", ")}))
+				displayOverlap := make([]string, len(overlap))
+				for i, d := range overlap {
+					displayOverlap[i] = formatDateDisplay(d)
+				}
+				return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": strings.Join(displayOverlap, ", ")}))
 			}
 		}
 	}
@@ -577,6 +581,13 @@ func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID str
 		return err
 	}
 
+	// Check if new date overlaps with other dates in the same request (excluding the old date)
+	for _, d := range req.Dates {
+		if d != oldDate && d == newDate {
+			return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": formatDateDisplay(newDate)}))
+		}
+	}
+
 	// Check overlap of new date against other leave requests (exclude self)
 	existing, err := s.store.FindLeaveRequestsByUserAndDates(ctx, userID, []string{newDate})
 	if err != nil {
@@ -593,7 +604,7 @@ func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID str
 			}
 			overlap := findOverlap([]string{newDate}, checkDates)
 			if len(overlap) > 0 {
-				return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": strings.Join(overlap, ", ")}))
+				return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": formatDateDisplay(newDate)}))
 			}
 		}
 	}
@@ -810,8 +821,8 @@ func (s *AttendanceService) RejectDateChange(ctx context.Context, requestID, rej
 func leaveChangeMessageData(username, oldDate, newDate, reason, changeReason, status string) map[string]any {
 	return map[string]any{
 		"Username":     username,
-		"OldDate":      oldDate,
-		"NewDate":      newDate,
+		"OldDate":      formatDateDisplay(oldDate),
+		"NewDate":      formatDateDisplay(newDate),
 		"Reason":       reason,
 		"ChangeReason": changeReason,
 		"Status":       status,
@@ -866,14 +877,27 @@ func leaveMessageKey(leaveType model.LeaveType) string {
 }
 
 func leaveMessageData(username string, leaveType model.LeaveType, dates []string, reason, timeStr, status string) map[string]any {
+	displayDates := make([]string, len(dates))
+	for i, d := range dates {
+		displayDates[i] = formatDateDisplay(d)
+	}
 	return map[string]any{
 		"Username":     username,
 		"LeaveType":    string(leaveType),
-		"Dates":        strings.Join(dates, ", "),
+		"Dates":        strings.Join(displayDates, ", "),
 		"Reason":       reason,
 		"ExpectedTime": timeStr,
 		"Status":       status,
 	}
+}
+
+// formatDateDisplay converts a date from YYYY-MM-DD to DD/MM/YYYY for display.
+func formatDateDisplay(date string) string {
+	t, err := time.Parse(time.DateOnly, date)
+	if err != nil {
+		return date
+	}
+	return t.Format("02/01/2006")
 }
 
 func formatDuration(ctx context.Context, d time.Duration) string {

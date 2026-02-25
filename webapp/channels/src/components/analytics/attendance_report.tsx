@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FormattedMessage, defineMessages, useIntl } from 'react-intl';
 import { CellContext, ColumnDef, PaginationState, SortingState, getCoreRowModel, getPaginationRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table';
+import * as XLSX from 'xlsx';
 
 import { Client4 } from 'mattermost-redux/client';
 
@@ -100,19 +101,19 @@ const messages = defineMessages({
     dates: { id: 'analytics.attendance.dates', defaultMessage: 'Dates' },
     reason: { id: 'analytics.attendance.reason', defaultMessage: 'Reason' },
     totalBreaks: { id: 'analytics.attendance.totalBreaks', defaultMessage: 'Total Breaks' },
-    breakRest: { id: 'analytics.attendance.breakRest', defaultMessage: 'Nghỉ ngơi' },
-    breakEat: { id: 'analytics.attendance.breakEat', defaultMessage: 'Đi ăn' },
-    breakRestroomS: { id: 'analytics.attendance.breakRestroomS', defaultMessage: 'Tiểu tiện' },
-    breakRestroomL: { id: 'analytics.attendance.breakRestroomL', defaultMessage: 'Đại tiện' },
-    breakSmoke: { id: 'analytics.attendance.breakSmoke', defaultMessage: 'Hút thuốc' },
-    totalBreaksCol: {id: 'analytics.attendance.totalBreaksCol', defaultMessage: 'Nghỉ'},
-    breakRestCol: {id: 'analytics.attendance.breakRestCol', defaultMessage: 'Nghỉ ngơi'},
-    breakEatCol: {id: 'analytics.attendance.breakEatCol', defaultMessage: 'Đi ăn'},
-    breakRestroomSCol: {id: 'analytics.attendance.breakRestroomSCol', defaultMessage: 'Tiểu tiện'},
-    breakRestroomLCol: {id: 'analytics.attendance.breakRestroomLCol', defaultMessage: 'Đại tiện'},
-    breakSmokeCol: {id: 'analytics.attendance.breakSmokeCol', defaultMessage: 'Hút thuốc'},
-    breaks: {id: 'analytics.attendance.breaks', defaultMessage: 'Giải lao'},
-    onBreak: {id: 'analytics.attendance.onBreak', defaultMessage: 'đang nghỉ'},
+    breakRest: { id: 'analytics.attendance.breakRest', defaultMessage: 'Rest' },
+    breakEat: { id: 'analytics.attendance.breakEat', defaultMessage: 'Lunch' },
+    breakRestroomS: { id: 'analytics.attendance.breakRestroomS', defaultMessage: 'Restroom (short)' },
+    breakRestroomL: { id: 'analytics.attendance.breakRestroomL', defaultMessage: 'Restroom (long)' },
+    breakSmoke: { id: 'analytics.attendance.breakSmoke', defaultMessage: 'Smoking' },
+    totalBreaksCol: {id: 'analytics.attendance.totalBreaksCol', defaultMessage: 'Breaks'},
+    breakRestCol: {id: 'analytics.attendance.breakRestCol', defaultMessage: 'Rest'},
+    breakEatCol: {id: 'analytics.attendance.breakEatCol', defaultMessage: 'Lunch'},
+    breakRestroomSCol: {id: 'analytics.attendance.breakRestroomSCol', defaultMessage: 'Restroom (S)'},
+    breakRestroomLCol: {id: 'analytics.attendance.breakRestroomLCol', defaultMessage: 'Restroom (L)'},
+    breakSmokeCol: {id: 'analytics.attendance.breakSmokeCol', defaultMessage: 'Smoking'},
+    breaks: {id: 'analytics.attendance.breaks', defaultMessage: 'Breaks'},
+    onBreak: {id: 'analytics.attendance.onBreak', defaultMessage: 'on break'},
     back: { id: 'analytics.attendance.back', defaultMessage: 'Back to all users' },
     attendanceDetail: { id: 'analytics.attendance.attendanceDetail', defaultMessage: 'Attendance' },
     leaveDetail: { id: 'analytics.attendance.leaveDetail', defaultMessage: 'Leave Requests' },
@@ -120,6 +121,11 @@ const messages = defineMessages({
     from: { id: 'analytics.attendance.from', defaultMessage: 'From' },
     to: { id: 'analytics.attendance.to', defaultMessage: 'To' },
     searchPlaceholder: { id: 'analytics.attendance.searchPlaceholder', defaultMessage: 'Search by username...' },
+    breakLogReason: { id: 'analytics.attendance.breakLogReason', defaultMessage: 'Reason' },
+    breakLogStart: { id: 'analytics.attendance.breakLogStart', defaultMessage: 'Start' },
+    breakLogEnd: { id: 'analytics.attendance.breakLogEnd', defaultMessage: 'End' },
+    sheetSummary: { id: 'analytics.attendance.sheetSummary', defaultMessage: 'Summary' },
+    sheetDetail: { id: 'analytics.attendance.sheetDetail', defaultMessage: 'Detail' },
 });
 
 function formatDateStr(date: Date): string {
@@ -195,6 +201,58 @@ function calcBreakDuration(start: number, end: number): number {
     return end - start;
 }
 
+type FormatMessage = (msg: {id: string; defaultMessage: string}) => string;
+
+function exportToExcel(users: UserReport[], from: string, to: string, fmt: FormatMessage) {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Tổng hợp
+    const ws1 = XLSX.utils.aoa_to_sheet([
+        [
+            fmt(messages.username), fmt(messages.daysWorked), fmt(messages.daysLeave),
+            fmt(messages.lateArrivals), fmt(messages.earlyDepartures),
+            fmt(messages.breakRestCol), fmt(messages.breakEatCol),
+            fmt(messages.breakRestroomSCol), fmt(messages.breakRestroomLCol), fmt(messages.breakSmokeCol),
+        ],
+        ...users.map((u) => [
+            u.username, u.days_worked, u.days_leave,
+            u.late_arrivals, u.early_departures,
+            u.break_rest, u.break_eat, u.break_restroom_s, u.break_restroom_l, u.break_smoke,
+        ]),
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws1, fmt(messages.sheetSummary));
+
+    // Sheet 2: Chi tiết — 1 row/break log; ngày không có break thì 1 row trống ở cột break
+    const detailRows: Array<Array<string>> = [];
+    for (const u of users) {
+        for (const e of (u.attendance ?? [])) {
+            const checkIn = e.check_in ? fmtTime(e.check_in) : '';
+            const checkOut = e.check_out ? fmtTime(e.check_out) : '';
+            const base = [u.username, e.date, checkIn, checkOut, e.status];
+            if (!e.breaks || e.breaks.length === 0) {
+                detailRows.push([...base, '', '', '']);
+            } else {
+                for (const b of e.breaks) {
+                    const meta = BREAK_REASON_META[b.reason];
+                    const reasonLabel = meta ? fmt(messages[meta.msgKey]) : b.reason;
+                    detailRows.push([...base, reasonLabel, fmtTime(b.start), b.end ? fmtTime(b.end) : '']);
+                }
+            }
+        }
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet([
+        [
+            fmt(messages.username), fmt(messages.date),
+            fmt(messages.checkIn), fmt(messages.checkOut), fmt(messages.status),
+            fmt(messages.breakLogReason), fmt(messages.breakLogStart), fmt(messages.breakLogEnd),
+        ],
+        ...detailRows,
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws2, fmt(messages.sheetDetail));
+
+    XLSX.writeFile(wb, `attendance_${from}_${to}.xlsx`);
+}
+
 const BreakLogList: React.FC<{ entry: AttendanceEntry }> = ({entry}) => {
     const {formatMessage} = useIntl();
     const logs = entry.breaks ?? [];
@@ -211,10 +269,10 @@ const BreakLogList: React.FC<{ entry: AttendanceEntry }> = ({entry}) => {
             >
                 <thead>
                     <tr>
-                        <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}>{'Ra'}</th>
-                        <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}>{'Vào'}</th>
-                        <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}>{'Loại'}</th>
-                        <th style={{fontWeight: 600, textAlign: 'left'}}>{'TG'}</th>
+                        <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}><FormattedMessage {...messages.breakLogStart}/></th>
+                        <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}><FormattedMessage {...messages.breakLogEnd}/></th>
+                        <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}><FormattedMessage {...messages.breakLogReason}/></th>
+                        <th style={{fontWeight: 600, textAlign: 'left'}}><FormattedMessage {...messages.totalBreaks}/></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -424,6 +482,16 @@ const AttendanceReportPage: React.FC = () => {
     // Table states
     const [sorting, setSorting] = useState<SortingState>([]);
     const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZES[0] });
+
+    const dateRange = useMemo(() => {
+        if (filterMode === 'month') {
+            const [yearStr, monthStr] = selectedMonth.split('-');
+            const lastDay = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0).getDate();
+            return {from: `${selectedMonth}-01`, to: `${selectedMonth}-${String(lastDay).padStart(2, '0')}`};
+        }
+        const day = `${selectedMonth}-${String(selectedDay).padStart(2, '0')}`;
+        return {from: day, to: day};
+    }, [selectedMonth, filterMode, selectedDay]);
 
     const filteredUsers: UserReport[] = useMemo(() => {
         if (!report?.users) {
@@ -725,6 +793,14 @@ const AttendanceReportPage: React.FC = () => {
                                             setFilterTeamLabel(label || '');
                                         }}
                                     />
+                                    <button
+                                        className='btn btn-default'
+                                        disabled={filteredUsers.length === 0}
+                                        onClick={() => exportToExcel(filteredUsers, dateRange.from, dateRange.to, formatMessage)}
+                                    >
+                                        <i className='fa fa-download'/>
+                                        {' Export Excel'}
+                                    </button>
                                 </div>
                                 <AdminConsoleListTable
                                     table={table}

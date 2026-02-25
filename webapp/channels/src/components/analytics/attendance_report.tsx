@@ -128,17 +128,17 @@ const messages = defineMessages({
     sheetDetail: { id: 'analytics.attendance.sheetDetail', defaultMessage: 'Detail' },
 });
 
-function formatDateStr(date: Date): string {
-    return date.toISOString().slice(0, 10);
-}
-
 function formatBreakDuration(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const h = Math.floor(m / 60);
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
     if (h > 0) {
-        return `${h}g ${m % 60}p`;
+        return `${h}g ${m}p ${s}s`;
     }
-    return `${m}p`;
+    if (m > 0) {
+        return `${m}p ${s}s`;
+    }
+    return `${s}s`;
 }
 
 
@@ -252,12 +252,13 @@ function exportToExcel(users: UserReport[], from: string, to: string, fmt: Forma
             const checkOut = e.check_out ? fmtTime(e.check_out) : '';
             const base = [u.username, e.date, checkIn, checkOut, e.status];
             if (!e.breaks || e.breaks.length === 0) {
-                detailRows.push([...base, '', '', '']);
+                detailRows.push([...base, '', '', '', '']);
             } else {
                 for (const b of e.breaks) {
                     const meta = BREAK_REASON_META[b.reason];
                     const reasonLabel = meta ? fmt(messages[meta.msgKey]) : b.reason;
-                    detailRows.push([...base, reasonLabel, fmtTime(b.start), b.end ? fmtTime(b.end) : '']);
+                    const duration = b.end ? formatBreakDuration(calcBreakDuration(b.start, b.end)) : '';
+                    detailRows.push([...base, reasonLabel, fmtTime(b.start), b.end ? fmtTime(b.end) : '', duration]);
                 }
             }
         }
@@ -266,6 +267,7 @@ function exportToExcel(users: UserReport[], from: string, to: string, fmt: Forma
         fmt(messages.username), fmt(messages.date),
         fmt(messages.checkIn), fmt(messages.checkOut), fmt(messages.status),
         fmt(messages.breakLogReason), fmt(messages.breakLogStart), fmt(messages.breakLogEnd),
+        fmt(messages.totalBreaks),
     ];
     const sheet2Rows = [sheet2Header, ...detailRows];
     const ws2 = XLSX.utils.aoa_to_sheet(sheet2Rows);

@@ -460,7 +460,7 @@ func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Req
 		sub.UserID,
 		sub.UserName,
 		sub.ChannelID,
-		model.LeaveTypeAnnual,
+		model.LeaveTypeOff,
 		dates,
 		sub.Submission["reason"],
 		"",
@@ -771,9 +771,8 @@ func (h *AttendanceHandler) HandleChangeDatesForm(w http.ResponseWriter, r *http
 			if d < today {
 				continue
 			}
-			label := fmt.Sprintf("%s - %s (%s)",
-				i18n.T(ctx, leaveTypeI18nKey(l.Type)),
-				d,
+			label := fmt.Sprintf("%s (%s)",
+				model.FormatDateDisplay(d),
 				i18n.T(ctx, leaveStatusI18nKey(l.Status)),
 			)
 			options = append(options, mattermost.SelectOption{
@@ -975,18 +974,14 @@ func (h *AttendanceHandler) HandleChangeRejectSubmit(w http.ResponseWriter, r *h
 
 func leaveTypeI18nKey(lt model.LeaveType) string {
 	switch lt {
-	case model.LeaveTypeAnnual:
-		return "leave.type.annual"
-	case model.LeaveTypeEmergency:
-		return "leave.type.emergency"
-	case model.LeaveTypeSick:
-		return "leave.type.sick"
+	case model.LeaveTypeOff:
+		return "leave.type.off"
 	case model.LeaveTypeLateArrival:
 		return "leave.type.late"
 	case model.LeaveTypeEarlyDeparture:
 		return "leave.type.early"
 	default:
-		return "leave.type.annual"
+		return "leave.type.off"
 	}
 }
 

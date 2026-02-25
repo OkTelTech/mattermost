@@ -71,6 +71,7 @@
   "attendance.err.change_invalid_status": "Cannot change a request with status: {{.Status}}",
   "attendance.err.change_past_dates": "Cannot change: some original dates are already in the past.",
   "attendance.err.not_pending_change": "This request is not pending a date change.",
+  "attendance.msg.date_changed": "@{{.Username}} changed leave date from {{.OldDate}} to {{.NewDate}}.\n> **Reason:** {{.ChangeReason}}",
 
   "attendance.btn.change_dates": "Change Leave Dates",
   "attendance.btn.approve_change": "Approve Change",
@@ -86,9 +87,7 @@
   "duration.m": "min",
   "duration.s": "sec",
 
-  "leave.type.annual": "Annual Leave",
-  "leave.type.emergency": "Emergency Leave",
-  "leave.type.sick": "Sick Leave",
+  "leave.type.off": "Day Off",
   "leave.type.late": "Late Arrival",
   "leave.type.early": "Early Departure",
 
@@ -104,12 +103,10 @@
   "leave.field.reason": "**Reason**",
   "leave.field.status": "**Status**",
   "leave.status.pending": "Pending",
-  "leave.status.approved": "**APPROVED**",
-  "leave.status.rejected": "**REJECTED**",
+  "leave.status.approved": "APPROVED",
+  "leave.status.rejected": "REJECTED",
 
-  "leave.option.annual": "Annual Leave",
-  "leave.option.emergency": "Emergency Leave",
-  "leave.option.sick": "Sick Leave",
+  "leave.option.off": "Day Off",
 
   "budget.channel_error": "This command can only be used in channels with the `budget` prefix.",
   "budget.err.missing_trigger": "Missing trigger_id. Please try again.",

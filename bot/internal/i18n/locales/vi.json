@@ -71,6 +71,7 @@
   "attendance.err.change_invalid_status": "Không thể thay đổi yêu cầu ở trạng thái: {{.Status}}",
   "attendance.err.change_past_dates": "Không thể đổi: một số ngày gốc đã qua.",
   "attendance.err.not_pending_change": "Yêu cầu này không đang chờ duyệt thay đổi ngày.",
+  "attendance.msg.date_changed": "@{{.Username}} đã đổi ngày nghỉ từ {{.OldDate}} sang {{.NewDate}}.\n> **Lý do:** {{.ChangeReason}}",
 
   "attendance.btn.change_dates": "Đổi ngày nghỉ",
   "attendance.btn.approve_change": "Duyệt thay đổi",
@@ -86,9 +87,7 @@
   "duration.m": "phút",
   "duration.s": "giây",
 
-  "leave.type.annual": "Nghỉ phép năm",
-  "leave.type.emergency": "Nghỉ khẩn cấp",
-  "leave.type.sick": "Nghỉ ốm",
+  "leave.type.off": "Nghỉ phép",
   "leave.type.late": "Đi muộn",
   "leave.type.early": "Về sớm",
 
@@ -104,12 +103,10 @@
   "leave.field.reason": "**Lý do**",
   "leave.field.status": "**Trạng thái**",
   "leave.status.pending": "Chờ duyệt",
-  "leave.status.approved": "**ĐÃ DUYỆT**",
-  "leave.status.rejected": "**ĐÃ TỪ CHỐI**",
+  "leave.status.approved": "ĐÃ DUYỆT",
+  "leave.status.rejected": "ĐÃ TỪ CHỐI",
 
-  "leave.option.annual": "Nghỉ phép năm",
-  "leave.option.emergency": "Nghỉ khẩn cấp",
-  "leave.option.sick": "Nghỉ ốm",
+  "leave.option.off": "Nghỉ phép",
 
   "budget.channel_error": "Lệnh này chỉ có thể sử dụng trong các kênh có tiền tố `budget`.",
   "budget.err.missing_trigger": "Thiếu trigger_id. Vui lòng thử lại.",

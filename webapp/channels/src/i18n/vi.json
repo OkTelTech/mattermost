@@ -5227,7 +5227,7 @@
   "leave.type.late_arrival": "Đi muộn",
   "leave.type.early_departure": "Về sớm",
   "leave.status.pending": "Chờ duyệt",
-  "leave.status.approved": "**ĐÃ DUYỆT**",
-  "leave.status.rejected": "**ĐÃ TỪ CHỐI**",
-  "leave.status.pending_change": "**CHỜ DUYỆT THAY ĐỔI**"
+  "leave.status.approved": "ĐÃ DUYỆT",
+  "leave.status.rejected": "ĐÃ TỪ CHỐI",
+  "leave.status.pending_change": "CHỜ DUYỆT THAY ĐỔI"
 }

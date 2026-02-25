@@ -6829,7 +6829,7 @@
   "leave.type.late_arrival": "Late Arrival",
   "leave.type.early_departure": "Early Departure",
   "leave.status.pending": "Pending",
-  "leave.status.approved": "**APPROVED**",
-  "leave.status.rejected": "**REJECTED**",
-  "leave.status.pending_change": "**PENDING CHANGE**"
+  "leave.status.approved": "APPROVED",
+  "leave.status.rejected": "REJECTED",
+  "leave.status.pending_change": "PENDING CHANGE"
 }

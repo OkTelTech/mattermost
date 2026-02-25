@@ -6817,6 +6817,6 @@
   "leave.type.late_arrival": "迟到",
   "leave.type.early_departure": "早退",
   "leave.status.pending": "待审批",
-  "leave.status.approved": "**已批准**",
-  "leave.status.rejected": "**已拒绝**"
+  "leave.status.approved": "已批准",
+  "leave.status.rejected": "已拒绝"
 }

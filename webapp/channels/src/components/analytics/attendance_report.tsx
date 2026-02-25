@@ -194,7 +194,7 @@ const BREAK_REASON_META: Record<string, { icon: string; msgKey: keyof typeof mes
 };
 
 function fmtTime(unix: number): string {
-    return new Date(unix * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'});
+    return new Date(unix * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 }
 
 function calcBreakDuration(start: number, end: number): number {

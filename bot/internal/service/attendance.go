@@ -655,16 +655,12 @@ func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID str
 		s.mm.CreatePost(&mattermost.Post{
 			ChannelID: req.ApprovalChannelID,
 			RootID:    req.ApprovalPostID,
-			Message:   "@all",
-			Props: mattermost.Props{
-				MessageKey: "attendance.msg.date_changed",
-				MessageData: map[string]any{
-					"Username":     req.Username,
-					"OldDate":      model.FormatDateDisplay(oldDate),
-					"NewDate":      model.FormatDateDisplay(newDate),
-					"ChangeReason": changeReason,
-				},
-			},
+			Message: i18n.T(ctx, "attendance.msg.date_changed", map[string]any{
+				"Username":     req.Username,
+				"OldDate":      model.FormatDateDisplay(oldDate),
+				"NewDate":      model.FormatDateDisplay(newDate),
+				"ChangeReason": changeReason,
+			}),
 		})
 
 		return nil

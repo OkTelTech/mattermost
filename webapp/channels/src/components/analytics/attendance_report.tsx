@@ -203,11 +203,31 @@ function calcBreakDuration(start: number, end: number): number {
 
 type FormatMessage = (msg: {id: string; defaultMessage: string}) => string;
 
+function autoColWidths(rows: Array<Array<string | number>>): Array<{wch: number}> {
+    if (rows.length === 0) {
+        return [];
+    }
+    const numCols = rows[0].length;
+    const widths = new Array(numCols).fill(8);
+    for (const row of rows) {
+        for (let c = 0; c < row.length; c++) {
+            const val = row[c] == null ? '' : String(row[c]);
+
+            // Vietnamese/unicode chars count as ~1.6 chars width
+            const len = [...val].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 127 ? 1.6 : 1), 0);
+            if (len > widths[c]) {
+                widths[c] = len;
+            }
+        }
+    }
+    return widths.map((w) => ({wch: Math.min(Math.ceil(w) + 2, 50)}));
+}
+
 function exportToExcel(users: UserReport[], from: string, to: string, fmt: FormatMessage) {
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: Tổng hợp
-    const ws1 = XLSX.utils.aoa_to_sheet([
+    const sheet1Rows = [
         [
             fmt(messages.username), fmt(messages.daysWorked), fmt(messages.daysLeave),
             fmt(messages.lateArrivals), fmt(messages.earlyDepartures),
@@ -219,7 +239,9 @@ function exportToExcel(users: UserReport[], from: string, to: string, fmt: Forma
             u.late_arrivals, u.early_departures,
             u.break_rest, u.break_eat, u.break_restroom_s, u.break_restroom_l, u.break_smoke,
         ]),
-    ]);
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(sheet1Rows);
+    ws1['!cols'] = autoColWidths(sheet1Rows);
     XLSX.utils.book_append_sheet(wb, ws1, fmt(messages.sheetSummary));
 
     // Sheet 2: Chi tiết — 1 row/break log; ngày không có break thì 1 row trống ở cột break
@@ -240,14 +262,14 @@ function exportToExcel(users: UserReport[], from: string, to: string, fmt: Forma
             }
         }
     }
-    const ws2 = XLSX.utils.aoa_to_sheet([
-        [
-            fmt(messages.username), fmt(messages.date),
-            fmt(messages.checkIn), fmt(messages.checkOut), fmt(messages.status),
-            fmt(messages.breakLogReason), fmt(messages.breakLogStart), fmt(messages.breakLogEnd),
-        ],
-        ...detailRows,
-    ]);
+    const sheet2Header = [
+        fmt(messages.username), fmt(messages.date),
+        fmt(messages.checkIn), fmt(messages.checkOut), fmt(messages.status),
+        fmt(messages.breakLogReason), fmt(messages.breakLogStart), fmt(messages.breakLogEnd),
+    ];
+    const sheet2Rows = [sheet2Header, ...detailRows];
+    const ws2 = XLSX.utils.aoa_to_sheet(sheet2Rows);
+    ws2['!cols'] = autoColWidths(sheet2Rows);
     XLSX.utils.book_append_sheet(wb, ws2, fmt(messages.sheetDetail));
 
     XLSX.writeFile(wb, `attendance_${from}_${to}.xlsx`);

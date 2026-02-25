@@ -525,15 +525,34 @@ type UserReport struct {
 	DaysLeave       int               `json:"days_leave"`
 	LateArrivals    int               `json:"late_arrivals"`
 	EarlyDepartures int               `json:"early_departures"`
+	BreakRest       int               `json:"break_rest"`
+	BreakEat        int               `json:"break_eat"`
+	BreakRestroomS  int               `json:"break_restroom_s"`
+	BreakRestroomL  int               `json:"break_restroom_l"`
+	BreakSmoke      int               `json:"break_smoke"`
 	Attendance      []AttendanceEntry `json:"attendance"`
 	LeaveRequests   []LeaveEntry      `json:"leave_requests"`
 }
 
+// BreakLog is a single break record with start/end times.
+type BreakLog struct {
+	Reason string `json:"reason"`
+	Start int64  `json:"start"`
+	End   int64  `json:"end,omitempty"`
+}
+
 type AttendanceEntry struct {
-	Date     string `json:"date"`
-	CheckIn  string `json:"check_in"`
-	CheckOut string `json:"check_out,omitempty"`
-	Status   string `json:"status"`
+	Date           string     `json:"date"`
+	CheckIn        int64      `json:"check_in,omitempty"`
+	CheckOut       int64      `json:"check_out,omitempty"`
+	Status         string     `json:"status"`
+	TotalBreaks    int        `json:"total_breaks"`
+	BreakRest      int        `json:"break_rest"`
+	BreakEat       int        `json:"break_eat"`
+	BreakRestroomS int        `json:"break_restroom_s"`
+	BreakRestroomL int        `json:"break_restroom_l"`
+	BreakSmoke     int        `json:"break_smoke"`
+	Breaks         []BreakLog `json:"breaks,omitempty"`
 }
 
 type LeaveEntry struct {
@@ -584,10 +603,39 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 			Status: string(rec.Status),
 		}
 		if rec.CheckIn != nil {
-			entry.CheckIn = rec.CheckIn.Format("15:04")
+			entry.CheckIn = rec.CheckIn.Unix()
 		}
 		if rec.CheckOut != nil {
-			entry.CheckOut = rec.CheckOut.Format("15:04")
+			entry.CheckOut = rec.CheckOut.Unix()
+		}
+
+		for _, b := range rec.Breaks {
+			entry.TotalBreaks++
+			log := BreakLog{
+				Reason: b.Reason,
+				Start:  b.Start.Unix(),
+			}
+			if b.End != nil {
+				log.End = b.End.Unix()
+			}
+			entry.Breaks = append(entry.Breaks, log)
+			switch b.Reason {
+			case "nghi_ngoi":
+				u.BreakRest++
+				entry.BreakRest++
+			case "di_an":
+				u.BreakEat++
+				entry.BreakEat++
+			case "tieu_tien":
+				u.BreakRestroomS++
+				entry.BreakRestroomS++
+			case "dai_tien":
+				u.BreakRestroomL++
+				entry.BreakRestroomL++
+			case "hut_thuoc":
+				u.BreakSmoke++
+				entry.BreakSmoke++
+			}
 		}
 		u.Attendance = append(u.Attendance, entry)
 		u.DaysWorked++
@@ -634,16 +682,16 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 
 // AttendanceStats contains aggregate counts for a date range.
 type AttendanceStats struct {
-	From             string `json:"from"`
-	To               string `json:"to"`
-	TotalCheckedIn   int    `json:"total_checked_in"`
-	TotalWorking     int    `json:"total_working"`
-	TotalOnBreak     int    `json:"total_on_break"`
-	TotalCheckedOut  int    `json:"total_checked_out"`
-	TotalOnLeave     int    `json:"total_on_leave"`
-	TotalLateArrival int    `json:"total_late_arrivals"`
-	TotalEarlyDepart int    `json:"total_early_departures"`
-	PendingRequests  int    `json:"pending_requests"`
+	From                  string `json:"from"`
+	To                    string `json:"to"`
+	TotalCheckedIn        int    `json:"total_checked_in"`
+	TotalWorking          int    `json:"total_working"`
+	TotalOnBreak          int    `json:"total_on_break"`
+	TotalCheckedOut       int    `json:"total_checked_out"`
+	TotalOnLeave          int    `json:"total_on_leave"`
+	TotalLateArrival      int    `json:"total_late_arrivals"`
+	TotalEarlyDepart      int    `json:"total_early_departures"`
+	PendingRequests       int    `json:"pending_requests"`
 }
 
 // GetAttendanceStats returns aggregate attendance counts for a date range.
@@ -680,6 +728,7 @@ func (s *AttendanceService) GetStats(ctx context.Context, from, to string) (*Att
 		case model.AttendanceStatusCompleted:
 			stats.TotalCheckedOut++
 		}
+
 	}
 
 	for _, req := range leaves {

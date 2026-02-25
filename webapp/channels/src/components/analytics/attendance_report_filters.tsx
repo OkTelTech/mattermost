@@ -1,22 +1,24 @@
-import React, { useRef, useState, useEffect, ReactElement } from 'react';
-import { useIntl, FormattedMessage } from 'react-intl';
-import { useDispatch } from 'react-redux';
-import { components } from 'react-select';
-import type { IndicatorsContainerProps, ControlProps, OptionProps, Options, OnChangeValue, StylesConfig } from 'react-select';
+import React, {useRef, useState, useEffect, useMemo, useCallback, ReactElement} from 'react';
+import {DayPicker} from 'react-day-picker';
+import {useIntl, FormattedMessage} from 'react-intl';
+import {useDispatch} from 'react-redux';
+import {components} from 'react-select';
+import type {IndicatorsContainerProps, ControlProps, OptionProps, Options, OnChangeValue, StylesConfig} from 'react-select';
 import AsyncSelect from 'react-select/async';
 import classNames from 'classnames';
 
-import type { Team, TeamSearchOpts } from '@mattermost/types/teams';
-import { getTeams, searchTeams } from 'mattermost-redux/actions/teams';
-import type { ActionResult } from 'mattermost-redux/types/actions';
+import type {Team, TeamSearchOpts} from '@mattermost/types/teams';
+import {getTeams, searchTeams} from 'mattermost-redux/actions/teams';
+import type {ActionResult} from 'mattermost-redux/types/actions';
 
 import Input from 'components/widgets/inputs/input/input';
 import InputError from 'components/input_error';
 import LoadingSpinner from 'components/widgets/loading/loading_spinner';
 
-import { TeamFilters } from 'components/admin_console/system_users/constants';
-import { getDefaultSelectedTeam } from 'components/admin_console/system_users/utils';
+import {TeamFilters} from 'components/admin_console/system_users/constants';
+import {getDefaultSelectedTeam} from 'components/admin_console/system_users/utils';
 
+import 'react-day-picker/dist/style.css';
 import 'components/admin_console/system_users/system_users_filters_popover/system_users_filter_team/async_team_select.scss';
 import './attendance_report.scss';
 
@@ -72,21 +74,196 @@ export function AttendanceReportSearch({ term, onSearch }: SearchProps) {
 type DateFilterProps = {
     month: string;
     onChange: (val: string) => void;
+    selectedDay: number;
+    onDayChange: (day: number) => void;
+    filterMode: 'month' | 'date';
+    onFilterModeChange: (mode: 'month' | 'date') => void;
 }
 
-export function AttendanceReportDateFilter({ month, onChange }: DateFilterProps) {
-    const { formatMessage } = useIntl();
+type MonthPickerProps = {
+    month: string;  // YYYY-MM
+    onChange: (val: string) => void;
+    locale: string;
+}
+
+function MonthPicker({month, onChange, locale}: MonthPickerProps) {
+    const [yearNum, monthNum] = useMemo(() => {
+        const [y, m] = month.split('-');
+        return [parseInt(y, 10), parseInt(m, 10)];
+    }, [month]);
+
+    const [displayYear, setDisplayYear] = useState(yearNum);
+
+    // Sync displayYear when prop changes externally
+    useEffect(() => {
+        setDisplayYear(yearNum);
+    }, [yearNum]);
+
+    const monthNames = useMemo(() =>
+        Array.from({length: 12}, (_, i) =>
+            new Intl.DateTimeFormat(locale, {month: 'short'}).format(new Date(2000, i, 1)),
+        ),
+    [locale]);
+
+    const handleSelect = useCallback((m: number) => {
+        const mStr = String(m).padStart(2, '0');
+        onChange(`${displayYear}-${mStr}`);
+    }, [displayYear, onChange]);
 
     return (
-        <div className='system-users__filter'>
-            <Input
-                type='month'
-                name='month'
-                label={formatMessage({ id: 'analytics.attendance.month', defaultMessage: 'Month' })}
-                value={month}
-                onChange={(e) => onChange(e.target.value)}
-                containerClassName='attendanceDateInput'
-            />
+        <div className='attendance-month-picker'>
+            <div className='attendance-month-picker__caption'>
+                <button
+                    type='button'
+                    className='attendance-month-picker__nav'
+                    onClick={() => setDisplayYear((y) => y - 1)}
+                    aria-label='Previous year'
+                >
+                    <i className='icon icon-chevron-left'/>
+                </button>
+                <span className='attendance-month-picker__year'>{displayYear}</span>
+                <button
+                    type='button'
+                    className='attendance-month-picker__nav'
+                    onClick={() => setDisplayYear((y) => y + 1)}
+                    aria-label='Next year'
+                >
+                    <i className='icon icon-chevron-right'/>
+                </button>
+            </div>
+            <div className='attendance-month-picker__grid'>
+                {monthNames.map((name, idx) => {
+                    const m = idx + 1;
+                    const isSelected = displayYear === yearNum && m === monthNum;
+                    return (
+                        <button
+                            key={m}
+                            type='button'
+                            className={`attendance-month-picker__cell${isSelected ? ' selected' : ''}`}
+                            onClick={() => handleSelect(m)}
+                        >
+                            {name}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+export function AttendanceReportDateFilter({month, onChange, selectedDay, onDayChange, filterMode, onFilterModeChange}: DateFilterProps) {
+    const {formatMessage, locale} = useIntl();
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Parse month string into year/month for the DayPicker
+    const [yearNum, monthNum] = useMemo(() => {
+        const [y, m] = month.split('-');
+        return [parseInt(y, 10), parseInt(m, 10)];
+    }, [month]);
+
+    // The displayed month for DayPicker (0-indexed)
+    const displayMonth = useMemo(() => new Date(yearNum, monthNum - 1, 1), [yearNum, monthNum]);
+
+    // The selected date
+    const selectedDate = useMemo(() => new Date(yearNum, monthNum - 1, selectedDay), [yearNum, monthNum, selectedDay]);
+
+    // Clamp day if it exceeds days in month
+    const daysInMonth = useMemo(() => new Date(yearNum, monthNum, 0).getDate(), [yearNum, monthNum]);
+    useEffect(() => {
+        if (selectedDay > daysInMonth) {
+            onDayChange(daysInMonth);
+        }
+    }, [daysInMonth, selectedDay, onDayChange]);
+
+    const handleDayClick = useCallback((day: Date) => {
+        onDayChange(day.getDate());
+        setIsOpen(false);
+    }, [onDayChange]);
+
+    const handleMonthChange = useCallback((newMonth: Date) => {
+        const y = newMonth.getFullYear();
+        const m = String(newMonth.getMonth() + 1).padStart(2, '0');
+        onChange(`${y}-${m}`);
+    }, [onChange]);
+
+    const handleMonthSelect = useCallback((val: string) => {
+        onChange(val);
+        setIsOpen(false);
+    }, [onChange]);
+
+    const selectedLabel = useMemo(() => {
+        if (filterMode === 'month') {
+            return new Intl.DateTimeFormat(locale, {month: 'short', year: 'numeric'}).format(new Date(yearNum, monthNum - 1, 1));
+        }
+        return new Intl.DateTimeFormat(locale, {day: '2-digit', month: '2-digit', year: 'numeric'}).format(new Date(yearNum, monthNum - 1, selectedDay));
+    }, [filterMode, locale, yearNum, monthNum, selectedDay]);
+
+    return (
+        <div
+            className='attendance-date-filter'
+            ref={containerRef}
+        >
+            <button
+                type='button'
+                className='attendance-date-filter__trigger'
+                onClick={() => setIsOpen((v) => !v)}
+            >
+                <i className='icon icon-calendar-outline'/>
+                <span>{selectedLabel}</span>
+                <i className={`icon icon-chevron-${isOpen ? 'up' : 'down'}`}/>
+            </button>
+            {isOpen && (
+                <div className='attendance-date-filter__dropdown'>
+                    <div className='attendance-date-filter__segment'>
+                        <button
+                            className={`attendance-date-filter__seg-btn${filterMode === 'month' ? ' active' : ''}`}
+                            onClick={() => onFilterModeChange('month')}
+                            type='button'
+                        >
+                            <i className='icon icon-calendar-outline'/>
+                            {formatMessage({id: 'analytics.attendance.filterByMonth', defaultMessage: 'By month'})}
+                        </button>
+                        <button
+                            className={`attendance-date-filter__seg-btn${filterMode === 'date' ? ' active' : ''}`}
+                            onClick={() => onFilterModeChange('date')}
+                            type='button'
+                        >
+                            <i className='icon icon-calendar-today'/>
+                            {formatMessage({id: 'analytics.attendance.filterByDate', defaultMessage: 'By day'})}
+                        </button>
+                    </div>
+                    <div className='attendance-date-filter__calendar'>
+                        {filterMode === 'month' ? (
+                            <MonthPicker
+                                month={month}
+                                onChange={handleMonthSelect}
+                                locale={locale}
+                            />
+                        ) : (
+                            <DayPicker
+                                mode='single'
+                                month={displayMonth}
+                                onMonthChange={handleMonthChange}
+                                selected={selectedDate}
+                                onSelect={(day) => day && handleDayClick(day)}
+                                className='attendance-day-picker'
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

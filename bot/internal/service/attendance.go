@@ -542,10 +542,11 @@ type BreakLog struct {
 }
 
 type AttendanceEntry struct {
-	Date           string     `json:"date"`
-	CheckIn        int64      `json:"check_in,omitempty"`
-	CheckOut       int64      `json:"check_out,omitempty"`
-	Status         string     `json:"status"`
+	Date             string     `json:"date"`
+	CheckIn          int64      `json:"check_in,omitempty"`
+	CheckInImageID   string     `json:"checkin_image_id,omitempty"`
+	CheckOut         int64      `json:"check_out,omitempty"`
+	Status           string     `json:"status"`
 	TotalBreaks    int        `json:"total_breaks"`
 	BreakRest      int        `json:"break_rest"`
 	BreakEat       int        `json:"break_eat"`
@@ -604,6 +605,7 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 		}
 		if rec.CheckIn != nil {
 			entry.CheckIn = rec.CheckIn.Unix()
+			entry.CheckInImageID = rec.CheckInImageID
 		}
 		if rec.CheckOut != nil {
 			entry.CheckOut = rec.CheckOut.Unix()

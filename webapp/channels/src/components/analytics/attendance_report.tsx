@@ -8,17 +8,16 @@ import * as XLSX from 'xlsx';
 
 import { Client4 } from 'mattermost-redux/client';
 
-import { AdminConsoleListTable, LoadingStates, PAGE_SIZES } from 'components/admin_console/list_table';
-import type { TableMeta } from 'components/admin_console/list_table';
+import {AdminConsoleListTable, LoadingStates, PAGE_SIZES} from 'components/admin_console/list_table';
+import type {TableMeta} from 'components/admin_console/list_table';
 import AdminHeader from 'components/widgets/admin_console/admin_header';
 import Avatar from 'components/widgets/users/avatar';
 import LoadingScreen from 'components/loading_screen';
 import { imageURLForUser } from 'utils/utils';
 
-// Import filter components
-import { AttendanceReportSearch, AttendanceReportDateFilter, AttendanceReportTeamFilter } from './attendance_report_filters';
+import {AttendanceReportSearch, AttendanceReportDateFilter, AttendanceReportTeamFilter} from './attendance_report_filters';
+import CheckInImage from './checkin_image';
 import StatisticCount from './statistic_count';
-
 import './attendance_report.scss';
 
 // Types
@@ -40,6 +39,7 @@ type BreakLog = { reason: string; start: number; end?: number };
 type AttendanceEntry = {
     date: string;
     check_in: number;
+    checkin_image_id?: string;
     check_out?: number;
     status: string;
     total_breaks: number;
@@ -390,6 +390,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({user, filterMode, sele
                                 <span className='attendance-day-card__label'><FormattedMessage {...messages.checkIn} /></span>
                                 <span className='attendance-day-card__value'>{fmtTime(singleEntry.check_in)}</span>
                             </div>
+                            {singleEntry.checkin_image_id && <CheckInImage fileId={singleEntry.checkin_image_id}/>}
                             <div className='attendance-day-card__row'>
                                 <span className='attendance-day-card__label'><FormattedMessage {...messages.checkOut} /></span>
                                 <span className='attendance-day-card__value'>{singleEntry.check_out ? fmtTime(singleEntry.check_out) : '—'}</span>
@@ -425,6 +426,12 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({user, filterMode, sele
                                         <span className='attendance-day-card__label'><FormattedMessage {...messages.checkIn} /></span>
                                         <span className='attendance-day-card__value'>{fmtTime(entry.check_in)}</span>
                                     </div>
+                                    {entry.checkin_image_id && (
+                                        <CheckInImage
+                                            fileId={entry.checkin_image_id}
+                                            size={80}
+                                        />
+                                    )}
                                     <div className='attendance-day-card__row'>
                                         <span className='attendance-day-card__label'><FormattedMessage {...messages.checkOut} /></span>
                                         <span className='attendance-day-card__value'>{entry.check_out ? fmtTime(entry.check_out) : '—'}</span>

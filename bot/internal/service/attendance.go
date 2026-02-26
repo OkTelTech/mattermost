@@ -352,6 +352,7 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 	}
 
 	// Post approval message to approval channel (with buttons)
+	msgData["Mention"] = "@all"
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: approvalChannelID,
 		Message:   "@all",
@@ -622,6 +623,7 @@ func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID str
 		})
 
 		// Update existing approval post (keep buttons)
+		msgData["Mention"] = "@all"
 		s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
 			ChannelID: req.ApprovalChannelID,
 			Message:   "@all",
@@ -699,6 +701,7 @@ func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID str
 	}
 
 	// Create NEW approval post in approval channel (with buttons)
+	changeMsgData["Mention"] = "@all"
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
 		Message:   "@all",

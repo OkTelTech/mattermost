@@ -94,6 +94,8 @@ class PostMessageView extends React.PureComponent<Props, State> {
             // Extract non-template keys before ICU formatting
             const fileID = formattedData.FileID;
             delete formattedData.FileID;
+            const mention = formattedData.Mention;
+            delete formattedData.Mention;
 
             if (formattedData.Time && typeof formattedData.Time === 'number') {
                 const timeDate = new Date(formattedData.Time * 1000);
@@ -152,6 +154,9 @@ class PostMessageView extends React.PureComponent<Props, State> {
                     {id: messageKey, defaultMessage: post.message},
                     formattedData,
                 );
+                if (mention) {
+                    translated = `${mention}\n` + translated;
+                }
                 if (fileID) {
                     translated += `\n\n![photo](/api/v4/files/${fileID}/preview)`;
                 }

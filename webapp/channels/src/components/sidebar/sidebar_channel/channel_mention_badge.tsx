@@ -6,21 +6,23 @@ import React from 'react';
 
 type Props = {
     unreadMentions: number;
+    unreadMsgs?: number;
     hasUrgent?: boolean;
     icon?: React.ReactNode;
     className?: string;
 };
 
-export default function ChannelMentionBadge({unreadMentions, hasUrgent, icon, className}: Props) {
-    if (unreadMentions > 0) {
+export default function ChannelMentionBadge({unreadMentions, unreadMsgs, hasUrgent, icon, className}: Props) {
+    const count = unreadMentions > 0 ? unreadMentions : (unreadMsgs ?? 0);
+    if (count > 0) {
         return (
             <span
                 id='unreadMentions'
-                className={classNames({badge: true, urgent: hasUrgent}, className)}
+                className={classNames({badge: true, urgent: hasUrgent && unreadMentions > 0}, className)}
             >
                 {icon}
                 <span className='unreadMentions'>
-                    {unreadMentions}
+                    {count}
                 </span>
             </span>
         );

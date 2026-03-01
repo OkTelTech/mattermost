@@ -30,7 +30,7 @@ type CheckInResult struct {
 	PostID  string
 }
 
-func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID string) (*CheckInResult, error) {
+func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID, device string) (*CheckInResult, error) {
 	now := time.Now()
 	date := now.Format(time.DateOnly)
 
@@ -57,6 +57,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 		ChannelID: channelID,
 		Date:      date,
 		CheckIn:   &now,
+		Device:    device,
 		Status:    model.AttendanceStatusWorking,
 	}
 	if err := s.store.CreateRecord(ctx, record); err != nil {
@@ -549,6 +550,7 @@ type AttendanceEntry struct {
 	Date             string     `json:"date"`
 	CheckIn          int64      `json:"check_in,omitempty"`
 	CheckInImageID   string     `json:"checkin_image_id,omitempty"`
+	Device           string     `json:"device,omitempty"`
 	CheckOut         int64      `json:"check_out,omitempty"`
 	CheckOutImageID  string     `json:"checkout_image_id,omitempty"`
 	Status           string     `json:"status"`
@@ -611,6 +613,7 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 		if rec.CheckIn != nil {
 			entry.CheckIn = rec.CheckIn.Unix()
 			entry.CheckInImageID = rec.CheckInImageID
+			entry.Device = rec.Device
 		}
 		if rec.CheckOut != nil {
 			entry.CheckOut = rec.CheckOut.Unix()

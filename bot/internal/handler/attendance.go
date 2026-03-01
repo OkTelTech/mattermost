@@ -29,6 +29,30 @@ func (h *AttendanceHandler) isMobileRequest(r *http.Request) bool {
 	return h.blockMobile && r.Header.Get("X-Mattermost-Is-Mobile") == "true"
 }
 
+// deviceFromHeaders builds a device description from headers forwarded by the Mattermost server.
+// Example output: "Chrome/120.0 (Windows 10)" or "Mattermost Mobile (iPhone, iOS 17.2)".
+func deviceFromHeaders(r *http.Request) string {
+	browser := r.Header.Get("X-Mattermost-Browser")
+	platform := r.Header.Get("X-Mattermost-Platform")
+	os := r.Header.Get("X-Mattermost-Os")
+
+	if browser == "" && platform == "" && os == "" {
+		return ""
+	}
+
+	device := browser
+	switch {
+	case platform != "" && os != "":
+		device += " (" + platform + ", " + os + ")"
+	case platform != "":
+		device += " (" + platform + ")"
+	case os != "":
+		device += " (" + os + ")"
+	}
+
+	return strings.TrimSpace(device)
+}
+
 func (h *AttendanceHandler) denyMobileSlash(ctx context.Context, w http.ResponseWriter) {
 	writeJSON(w, SlashResponse{
 		ResponseType: "ephemeral",
@@ -289,8 +313,9 @@ func (h *AttendanceHandler) HandleCheckInSubmit(w http.ResponseWriter, r *http.R
 	}
 
 	fileID := sub.Submission["photo"]
+	device := deviceFromHeaders(r)
 
-	result, err := h.svc.CheckIn(ctx, sub.UserID, username, sub.ChannelID, fileID)
+	result, err := h.svc.CheckIn(ctx, sub.UserID, username, sub.ChannelID, fileID, device)
 	if err != nil {
 		log.Printf("ERROR check-in: %v", err)
 		writeJSON(w, map[string]string{"error": err.Error()})

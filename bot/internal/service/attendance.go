@@ -266,7 +266,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username strin
 	return fmt.Sprintf("%s checked out at %s", username, now.Format(time.TimeOnly)), nil
 }
 
-func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr string) error {
+func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr, approver string) error {
 	// Lookup username if not provided (dialog submissions may omit it)
 	if username == "" {
 		user, err := s.mm.GetUser(userID)
@@ -352,10 +352,14 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 	}
 
 	// Post approval message to approval channel (with buttons)
-	msgData["Mention"] = "@all"
+	mention := "@all"
+	if approver != "" {
+		mention = "@" + approver
+	}
+	msgData["Mention"] = mention
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: approvalChannelID,
-		Message:   "@all",
+		Message:   mention,
 		Props: mattermost.Props{
 			MessageKey:  msgKey,
 			MessageData: msgData,

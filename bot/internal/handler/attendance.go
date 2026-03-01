@@ -389,40 +389,84 @@ func (h *AttendanceHandler) HandleLeaveForm(w http.ResponseWriter, r *http.Reque
 
 	ctx := h.localeCtx(r.Context(), req.UserID)
 
-	err := h.mm.OpenDialog(&mattermost.DialogRequest{
+	// Build approver options from approval channel members
+	var approverOptions []mattermost.SelectOption
+	channelInfo, err := h.mm.GetChannel(req.ChannelID)
+	if err == nil {
+		suffix := strings.TrimPrefix(channelInfo.Name, model.AttendanceChannel)
+		approvalChannelName := model.AttendanceApprovalChannel + suffix
+		approvalChannelID, err := h.mm.GetChannelByName(channelInfo.TeamID, approvalChannelName)
+		if err == nil {
+			members, err := h.mm.GetChannelMembers(approvalChannelID)
+			if err == nil {
+				for _, m := range members {
+					user, err := h.mm.GetUser(m.UserID)
+					if err != nil {
+						continue
+					}
+					approverOptions = append(approverOptions, mattermost.SelectOption{
+						Text:  "@" + user.Username,
+						Value: user.Username,
+					})
+				}
+			}
+		}
+	}
+
+	elements := []mattermost.DialogElement{
+		{
+			DisplayName: i18n.T(ctx, "attendance.field.date1"),
+			Name:        "date1",
+			Type:        "text",
+			SubType:     "date",
+		},
+		{
+			DisplayName: i18n.T(ctx, "attendance.field.date2"),
+			Name:        "date2",
+			Type:        "text",
+			SubType:     "date",
+			Optional:    true,
+		},
+		{
+			DisplayName: i18n.T(ctx, "attendance.field.date3"),
+			Name:        "date3",
+			Type:        "text",
+			SubType:     "date",
+			Optional:    true,
+		},
+		{
+			DisplayName: i18n.T(ctx, "attendance.field.date4"),
+			Name:        "date4",
+			Type:        "text",
+			SubType:     "date",
+			Optional:    true,
+		},
+		{
+			DisplayName: i18n.T(ctx, "attendance.field.reason"),
+			Name:        "reason",
+			Type:        "textarea",
+			Placeholder: i18n.T(ctx, "attendance.placeholder.reason"),
+		},
+	}
+
+	if len(approverOptions) > 0 {
+		elements = append(elements, mattermost.DialogElement{
+			DisplayName: i18n.T(ctx, "attendance.field.approver"),
+			Name:        "approver",
+			Type:        "select",
+			Optional:    true,
+			Options:     approverOptions,
+			Placeholder: i18n.T(ctx, "attendance.placeholder.approver"),
+		})
+	}
+
+	err = h.mm.OpenDialog(&mattermost.DialogRequest{
 		TriggerID: req.TriggerID,
 		URL:       h.botURL + "/api/attendance/leave",
 		Dialog: mattermost.Dialog{
 			Title:       i18n.T(ctx, "attendance.dialog.leave_title"),
 			SubmitLabel: i18n.T(ctx, "attendance.dialog.submit"),
-			Elements: []mattermost.DialogElement{
-				{
-					DisplayName: i18n.T(ctx, "attendance.field.date1"),
-					Name:        "date1",
-					Type:        "text",
-					SubType:     "date",
-				},
-				{
-					DisplayName: i18n.T(ctx, "attendance.field.date2"),
-					Name:        "date2",
-					Type:        "text",
-					SubType:     "date",
-					Optional:    true,
-				},
-				{
-					DisplayName: i18n.T(ctx, "attendance.field.date3"),
-					Name:        "date3",
-					Type:        "text",
-					SubType:     "date",
-					Optional:    true,
-				},
-				{
-					DisplayName: i18n.T(ctx, "attendance.field.reason"),
-					Name:        "reason",
-					Type:        "textarea",
-					Placeholder: i18n.T(ctx, "attendance.placeholder.reason"),
-				},
-			},
+			Elements:    elements,
 		},
 	})
 	if err != nil {
@@ -449,11 +493,13 @@ func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Req
 
 	// Collect dates from individual fields
 	var dates []string
-	for _, key := range []string{"date1", "date2", "date3"} {
+	for _, key := range []string{"date1", "date2", "date3", "date4"} {
 		if d := strings.TrimSpace(sub.Submission[key]); d != "" {
 			dates = append(dates, d)
 		}
 	}
+
+	approver := strings.TrimSpace(sub.Submission["approver"])
 
 	err := h.svc.CreateLeaveRequest(
 		ctx,
@@ -464,6 +510,7 @@ func (h *AttendanceHandler) HandleLeaveSubmit(w http.ResponseWriter, r *http.Req
 		dates,
 		sub.Submission["reason"],
 		"",
+		approver,
 	)
 	if err != nil {
 		log.Printf("ERROR create leave request: %v", err)
@@ -544,6 +591,7 @@ func (h *AttendanceHandler) HandleLateArrivalSubmit(w http.ResponseWriter, r *ht
 		[]string{sub.Submission["date"]},
 		sub.Submission["reason"],
 		sub.Submission["time"],
+		"",
 	)
 	if err != nil {
 		log.Printf("ERROR create late arrival request: %v", err)
@@ -624,6 +672,7 @@ func (h *AttendanceHandler) HandleEarlyDepartureSubmit(w http.ResponseWriter, r 
 		[]string{sub.Submission["date"]},
 		sub.Submission["reason"],
 		sub.Submission["time"],
+		"",
 	)
 	if err != nil {
 		log.Printf("ERROR create early departure request: %v", err)

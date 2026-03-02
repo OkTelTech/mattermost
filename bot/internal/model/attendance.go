@@ -21,9 +21,11 @@ const (
 
 // BreakRecord represents a single break period with a reason.
 type BreakRecord struct {
-	Start  time.Time  `bson:"start" json:"start"`
-	End    *time.Time `bson:"end,omitempty" json:"end,omitempty"`
-	Reason string     `bson:"reason" json:"reason"`
+	Start       time.Time  `bson:"start" json:"start"`
+	StartDevice string     `bson:"start_device,omitempty" json:"start_device,omitempty"`
+	End         *time.Time `bson:"end,omitempty" json:"end,omitempty"`
+	EndDevice   string     `bson:"end_device,omitempty" json:"end_device,omitempty"`
+	Reason      string     `bson:"reason" json:"reason"`
 }
 
 type AttendanceRecord struct {
@@ -36,9 +38,10 @@ type AttendanceRecord struct {
 	Date            string           `bson:"date" json:"date"`       // YYYY-MM-DD
 	CheckIn         *time.Time       `bson:"check_in,omitempty" json:"check_in"`
 	CheckInImageID  string           `bson:"checkin_image_id,omitempty" json:"checkin_image_id,omitempty"`
-	Device          string           `bson:"device,omitempty" json:"device,omitempty"` // "mobile" or "desktop"
+	CheckInDevice   string           `bson:"checkin_device,omitempty" json:"checkin_device,omitempty"`
 	Breaks          []BreakRecord    `bson:"breaks" json:"breaks"`
 	CheckOut        *time.Time       `bson:"check_out,omitempty" json:"check_out"`
+	CheckOutDevice  string           `bson:"checkout_device,omitempty" json:"checkout_device,omitempty"`
 	CheckOutImageID string           `bson:"checkout_image_id,omitempty" json:"checkout_image_id,omitempty"`
 	Status          AttendanceStatus `bson:"status" json:"status"`
 	CreatedAt       time.Time        `bson:"created_at" json:"created_at"`

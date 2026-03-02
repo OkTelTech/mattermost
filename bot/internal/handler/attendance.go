@@ -343,8 +343,9 @@ func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Requ
 	}
 
 	reasonKey, _ := req.Context["reason"].(string)
+	device := deviceFromHeaders(r)
 
-	msg, err := h.svc.BreakStart(ctx, req.UserID, req.UserName, reasonKey)
+	msg, err := h.svc.BreakStart(ctx, req.UserID, req.UserName, reasonKey, device)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
@@ -367,7 +368,8 @@ func (h *AttendanceHandler) HandleBreakEnd(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	msg, err := h.svc.BreakEnd(ctx, req.UserID, req.UserName)
+	device := deviceFromHeaders(r)
+	msg, err := h.svc.BreakEnd(ctx, req.UserID, req.UserName, device)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
@@ -444,8 +446,9 @@ func (h *AttendanceHandler) HandleCheckOutSubmit(w http.ResponseWriter, r *http.
 	}
 
 	fileID := sub.Submission["photo"]
+	device := deviceFromHeaders(r)
 
-	_, err := h.svc.CheckOut(ctx, sub.UserID, username, fileID)
+	_, err := h.svc.CheckOut(ctx, sub.UserID, username, fileID, device)
 	if err != nil {
 		log.Printf("ERROR check-out: %v", err)
 		writeJSON(w, map[string]string{"error": err.Error()})

@@ -425,8 +425,8 @@ type ServiceSettings struct {
 	ExperimentalStrictCSRFEnforcement                 *bool `access:"experimental_features,write_restrictable,cloud_restrictable"`
 	EnableEmailInvitations                            *bool `access:"authentication_signup"`
 	DisableBotsWhenOwnerIsDeactivated                 *bool `access:"integrations_bot_accounts"`
-	EnableBotAccountCreation                          *bool   `access:"integrations_bot_accounts"`
-	EnableSVGs                                        *bool   `access:"site_posts"`
+	EnableBotAccountCreation                          *bool `access:"integrations_bot_accounts"`
+	EnableSVGs                                        *bool `access:"site_posts"`
 	EnableLatex                                       *bool `access:"site_posts"`
 	EnableInlineLatex                                 *bool `access:"site_posts"`
 	PostPriority                                      *bool `access:"site_posts"`
@@ -1809,6 +1809,9 @@ type FileSettings struct {
 	AmazonS3RequestTimeoutMilliseconds *int64  `access:"environment_file_storage,write_restrictable,cloud_restrictable"` // telemetry: none
 	AmazonS3UploadPartSizeBytes        *int64  `access:"environment_file_storage,write_restrictable,cloud_restrictable"` // telemetry: none
 	AmazonS3StorageClass               *string `access:"environment_file_storage,write_restrictable,cloud_restrictable"` // telemetry: none
+	AmazonS3PresignExpiresSeconds      *int64  `access:"environment_file_storage,write_restrictable,cloud_restrictable"` // telemetry: none
+	EnablePresignedFileDownloads       *bool   `access:"environment_file_storage,write_restrictable,cloud_restrictable"`
+	EnablePresignedFileUploads         *bool   `access:"environment_file_storage,write_restrictable,cloud_restrictable"`
 	// Export store settings
 	DedicatedExportStore                     *bool   `access:"environment_file_storage,write_restrictable"`
 	ExportDriverName                         *string `access:"environment_file_storage,write_restrictable"`
@@ -1941,6 +1944,18 @@ func (s *FileSettings) SetDefaults(isUpdate bool) {
 
 	if s.AmazonS3StorageClass == nil {
 		s.AmazonS3StorageClass = NewPointer("")
+	}
+
+	if s.AmazonS3PresignExpiresSeconds == nil {
+		s.AmazonS3PresignExpiresSeconds = NewPointer(int64(21600)) // 6h
+	}
+
+	if s.EnablePresignedFileDownloads == nil {
+		s.EnablePresignedFileDownloads = NewPointer(false)
+	}
+
+	if s.EnablePresignedFileUploads == nil {
+		s.EnablePresignedFileUploads = NewPointer(false)
 	}
 
 	if s.DedicatedExportStore == nil {

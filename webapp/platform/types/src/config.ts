@@ -100,6 +100,8 @@ export type ClientConfig = {
     EnablePostIconOverride: string;
     EnablePostUsernameOverride: string;
     EnablePreviewModeBanner: string;
+    EnablePresignedFileDownloads: string;
+    EnablePresignedFileUploads: string;
     EnablePublicLink: string;
     EnableReliableWebSockets: string;
     EnableSaml: string;

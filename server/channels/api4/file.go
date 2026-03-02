@@ -583,6 +583,16 @@ func getFile(c *Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Try presigned URL redirect for S3 backends
+	if *c.App.Config().FileSettings.EnablePresignedFileDownloads {
+		if link, appErr := c.App.GeneratePresignedGetURL(fileInfo.Path); appErr == nil {
+			auditRec.Success()
+			http.Redirect(w, r, link, http.StatusFound)
+			return
+		}
+		// Fall through to proxy mode if presigned URL generation fails
+	}
+
 	fileReader, err := c.App.FileReader(fileInfo.Path)
 	if err != nil {
 		c.Err = err
@@ -629,6 +639,13 @@ func getFileThumbnail(c *Context, w http.ResponseWriter, r *http.Request) {
 	if info.ThumbnailPath == "" {
 		c.Err = model.NewAppError("getFileThumbnail", "api.file.get_file_thumbnail.no_thumbnail.app_error", nil, "file_id="+info.Id, http.StatusBadRequest)
 		return
+	}
+
+	if *c.App.Config().FileSettings.EnablePresignedFileDownloads {
+		if link, appErr := c.App.GeneratePresignedGetURL(info.ThumbnailPath); appErr == nil {
+			http.Redirect(w, r, link, http.StatusFound)
+			return
+		}
 	}
 
 	fileReader, err := c.App.FileReader(info.ThumbnailPath)
@@ -729,6 +746,13 @@ func getFilePreview(c *Context, w http.ResponseWriter, r *http.Request) {
 	if info.PreviewPath == "" {
 		c.Err = model.NewAppError("getFilePreview", "api.file.get_file_preview.no_preview.app_error", nil, "file_id="+info.Id, http.StatusBadRequest)
 		return
+	}
+
+	if *c.App.Config().FileSettings.EnablePresignedFileDownloads {
+		if link, appErr := c.App.GeneratePresignedGetURL(info.PreviewPath); appErr == nil {
+			http.Redirect(w, r, link, http.StatusFound)
+			return
+		}
 	}
 
 	fileReader, err := c.App.FileReader(info.PreviewPath)

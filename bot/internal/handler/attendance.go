@@ -797,8 +797,8 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
-// HandleReport returns attendance statistics filtered by date range and optionally by user and/or team.
-// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), user_id (optional), team_id (optional).
+// HandleReport returns attendance statistics filtered by date range and optionally by user, team and/or channel.
+// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), user_id (optional), team_id (optional), channel_id (optional).
 func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	from := q.Get("from")
@@ -808,7 +808,7 @@ func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	report, err := h.svc.GetReport(r.Context(), from, to, q.Get("user_id"), q.Get("team_id"))
+	report, err := h.svc.GetReport(r.Context(), from, to, q.Get("user_id"), q.Get("team_id"), q.Get("channel_id"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -818,7 +818,7 @@ func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request)
 }
 
 // HandleStats returns aggregate attendance statistics for a date range.
-// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required).
+// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), channel_id (optional).
 func (h *AttendanceHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	from := q.Get("from")
@@ -828,7 +828,7 @@ func (h *AttendanceHandler) HandleStats(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	stats, err := h.svc.GetStats(r.Context(), from, to)
+	stats, err := h.svc.GetStats(r.Context(), from, to, q.Get("channel_id"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

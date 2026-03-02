@@ -15,7 +15,7 @@ import Avatar from 'components/widgets/users/avatar';
 import LoadingScreen from 'components/loading_screen';
 import { imageURLForUser } from 'utils/utils';
 
-import {AttendanceReportSearch, AttendanceReportDateFilter, AttendanceReportTeamFilter} from './attendance_report_filters';
+import {AttendanceReportSearch, AttendanceReportDateFilter, AttendanceReportTeamFilter, AttendanceReportChannelFilter} from './attendance_report_filters';
 import CheckInImage from './checkin_image';
 import StatisticCount from './statistic_count';
 import './attendance_report.scss';
@@ -517,6 +517,8 @@ const AttendanceReportPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterTeam, setFilterTeam] = useState('');
     const [filterTeamLabel, setFilterTeamLabel] = useState('');
+    const [filterChannel, setFilterChannel] = useState('');
+    const [filterChannelLabel, setFilterChannelLabel] = useState('');
 
     // Table states
     const [sorting, setSorting] = useState<SortingState>([]);
@@ -576,6 +578,10 @@ const AttendanceReportPage: React.FC = () => {
             query += `&team_id=${filterTeam}`;
         }
 
+        if (filterChannel) {
+            query += `&channel_id=${filterChannel}`;
+        }
+
         try {
             const [statsRes, reportRes] = await Promise.all([
                 apiFetch(`${base}/bot-service/attendance/stats?${query}`),
@@ -601,7 +607,7 @@ const AttendanceReportPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedMonth, filterTeam, filterMode, selectedDay]);
+    }, [selectedMonth, filterTeam, filterChannel, filterMode, selectedDay]);
 
     useEffect(() => {
         fetchData();
@@ -830,6 +836,15 @@ const AttendanceReportPage: React.FC = () => {
                                         onChange={(id, label) => {
                                             setFilterTeam(id);
                                             setFilterTeamLabel(label || '');
+                                        }}
+                                    />
+                                    <AttendanceReportChannelFilter
+                                        filterTeam={filterTeam}
+                                        filterChannel={filterChannel}
+                                        filterChannelLabel={filterChannelLabel}
+                                        onChange={(id, label) => {
+                                            setFilterChannel(id);
+                                            setFilterChannelLabel(label || '');
                                         }}
                                     />
                                     <button

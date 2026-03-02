@@ -569,8 +569,8 @@ type LeaveEntry struct {
 	Status       string   `json:"status"`
 }
 
-// GetReport returns attendance statistics for a date range, optionally filtered by user and/or team.
-func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, teamID string) (*AttendanceReport, error) {
+// GetReport returns attendance statistics for a date range, optionally filtered by user, team and/or channel.
+func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, teamID, channelID string) (*AttendanceReport, error) {
 	if _, err := time.Parse(time.DateOnly, from); err != nil {
 		return nil, fmt.Errorf("invalid 'from' date, use YYYY-MM-DD: %w", err)
 	}
@@ -581,12 +581,12 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 		return nil, fmt.Errorf("'from' must be before or equal to 'to'")
 	}
 
-	attendanceRecs, err := s.store.GetAttendanceByDateRange(ctx, from, to, userID, teamID)
+	attendanceRecs, err := s.store.GetAttendanceByDateRange(ctx, from, to, userID, teamID, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get attendance: %w", err)
 	}
 
-	leaveReqs, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, userID, teamID)
+	leaveReqs, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, userID, teamID, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get leave requests: %w", err)
 	}
@@ -702,8 +702,8 @@ type AttendanceStats struct {
 	PendingRequests       int    `json:"pending_requests"`
 }
 
-// GetAttendanceStats returns aggregate attendance counts for a date range.
-func (s *AttendanceService) GetStats(ctx context.Context, from, to string) (*AttendanceStats, error) {
+// GetAttendanceStats returns aggregate attendance counts for a date range, optionally filtered by channel.
+func (s *AttendanceService) GetStats(ctx context.Context, from, to, channelID string) (*AttendanceStats, error) {
 	if _, err := time.Parse(time.DateOnly, from); err != nil {
 		return nil, fmt.Errorf("invalid 'from' date, use YYYY-MM-DD: %w", err)
 	}
@@ -714,12 +714,12 @@ func (s *AttendanceService) GetStats(ctx context.Context, from, to string) (*Att
 		return nil, fmt.Errorf("'from' must be before or equal to 'to'")
 	}
 
-	records, err := s.store.GetAttendanceByDateRange(ctx, from, to, "", "")
+	records, err := s.store.GetAttendanceByDateRange(ctx, from, to, "", "", channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get attendance: %w", err)
 	}
 
-	leaves, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, "", "")
+	leaves, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, "", "", channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get leave requests: %w", err)
 	}

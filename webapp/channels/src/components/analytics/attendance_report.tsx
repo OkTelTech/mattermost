@@ -34,13 +34,15 @@ type AttendanceStats = {
     pending_requests: number;
 };
 
-type BreakLog = { reason: string; start: number; end?: number };
+type BreakLog = { reason: string; start: number; start_device?: string; end?: number; end_device?: string };
 
 type AttendanceEntry = {
     date: string;
     check_in: number;
     checkin_image_id?: string;
+    checkin_device?: string;
     check_out?: number;
+    checkout_device?: string;
     checkout_image_id?: string;
     status: string;
     total_breaks: number;
@@ -127,6 +129,7 @@ const messages = defineMessages({
     breakLogEnd: { id: 'analytics.attendance.breakLogEnd', defaultMessage: 'End' },
     sheetSummary: { id: 'analytics.attendance.sheetSummary', defaultMessage: 'Summary' },
     sheetDetail: { id: 'analytics.attendance.sheetDetail', defaultMessage: 'Detail' },
+    device: { id: 'analytics.attendance.device', defaultMessage: 'Device' },
 });
 
 function formatBreakDuration(seconds: number): string {
@@ -251,24 +254,26 @@ function exportToExcel(users: UserReport[], from: string, to: string, fmt: Forma
         for (const e of (u.attendance ?? [])) {
             const checkIn = e.check_in ? fmtTime(e.check_in) : '';
             const checkOut = e.check_out ? fmtTime(e.check_out) : '';
-            const base = [u.username, e.date, checkIn, checkOut, e.status];
+            const base = [u.username, e.date, checkIn, e.checkin_device ?? '', checkOut, e.checkout_device ?? '', e.status];
             if (!e.breaks || e.breaks.length === 0) {
-                detailRows.push([...base, '', '', '', '']);
+                detailRows.push([...base, '', '', '', '', '']);
             } else {
                 for (const b of e.breaks) {
                     const meta = BREAK_REASON_META[b.reason];
                     const reasonLabel = meta ? fmt(messages[meta.msgKey]) : b.reason;
                     const duration = b.end ? formatBreakDuration(calcBreakDuration(b.start, b.end)) : '';
-                    detailRows.push([...base, reasonLabel, fmtTime(b.start), b.end ? fmtTime(b.end) : '', duration]);
+                    const breakDevice = [b.start_device ?? '', b.end_device ?? ''].filter(Boolean).join(' → ') || '';
+                    detailRows.push([...base, reasonLabel, fmtTime(b.start), b.end ? fmtTime(b.end) : '', duration, breakDevice]);
                 }
             }
         }
     }
+    const deviceLabel = fmt(messages.device);
     const sheet2Header = [
         fmt(messages.username), fmt(messages.date),
-        fmt(messages.checkIn), fmt(messages.checkOut), fmt(messages.status),
+        fmt(messages.checkIn), `${deviceLabel} (in)`, fmt(messages.checkOut), `${deviceLabel} (out)`, fmt(messages.status),
         fmt(messages.breakLogReason), fmt(messages.breakLogStart), fmt(messages.breakLogEnd),
-        fmt(messages.totalBreaks),
+        fmt(messages.totalBreaks), `${deviceLabel} (break)`,
     ];
     const sheet2Rows = [sheet2Header, ...detailRows];
     const ws2 = XLSX.utils.aoa_to_sheet(sheet2Rows);
@@ -297,7 +302,8 @@ const BreakLogList: React.FC<{ entry: AttendanceEntry }> = ({entry}) => {
                         <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}><FormattedMessage {...messages.breakLogStart}/></th>
                         <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}><FormattedMessage {...messages.breakLogEnd}/></th>
                         <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}><FormattedMessage {...messages.breakLogReason}/></th>
-                        <th style={{fontWeight: 600, textAlign: 'left'}}><FormattedMessage {...messages.totalBreaks}/></th>
+                        <th style={{fontWeight: 600, paddingRight: '12px', textAlign: 'left'}}><FormattedMessage {...messages.totalBreaks}/></th>
+                        <th style={{fontWeight: 600, textAlign: 'left'}}><FormattedMessage {...messages.device}/></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -315,7 +321,8 @@ const BreakLogList: React.FC<{ entry: AttendanceEntry }> = ({entry}) => {
                                 <td style={{paddingRight: '12px'}}>
                                     <i className={`fa ${icon}`}/>{' '}{label}
                                 </td>
-                                <td>{duration === null ? '-' : duration}</td>
+                                <td style={{paddingRight: '12px'}}>{duration === null ? '-' : duration}</td>
+                                <td style={{fontSize: '11px'}}>{b.start_device || b.end_device ? `${b.start_device || '—'} → ${b.end_device || '—'}` : '—'}</td>
                             </tr>
                         );
                     })}
@@ -394,11 +401,23 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({user, filterMode, sele
                                 <span className='attendance-day-card__value'>{fmtTime(singleEntry.check_in)}</span>
                             </div>
                             {singleEntry.checkin_image_id && <CheckInImage fileId={singleEntry.checkin_image_id}/>}
+                            {singleEntry.checkin_device && (
+                                <div className='attendance-day-card__row'>
+                                    <span className='attendance-day-card__label'><FormattedMessage {...messages.device} /></span>
+                                    <span className='attendance-day-card__value'>{singleEntry.checkin_device}</span>
+                                </div>
+                            )}
                             <div className='attendance-day-card__row'>
                                 <span className='attendance-day-card__label'><FormattedMessage {...messages.checkOut} /></span>
                                 <span className='attendance-day-card__value'>{singleEntry.check_out ? fmtTime(singleEntry.check_out) : '—'}</span>
                             </div>
                             {singleEntry.checkout_image_id && <CheckInImage fileId={singleEntry.checkout_image_id}/>}
+                            {singleEntry.checkout_device && (
+                                <div className='attendance-day-card__row'>
+                                    <span className='attendance-day-card__label'><FormattedMessage {...messages.device} /></span>
+                                    <span className='attendance-day-card__value'>{singleEntry.checkout_device}</span>
+                                </div>
+                            )}
                             <div className='attendance-day-card__row'>
                                 <span className='attendance-day-card__label'><FormattedMessage {...messages.status} /></span>
                                 <span className='attendance-day-card__value'>{statusBadge(singleEntry.status)}</span>
@@ -436,6 +455,12 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({user, filterMode, sele
                                             size={80}
                                         />
                                     )}
+                                    {entry.checkin_device && (
+                                        <div className='attendance-day-card__row'>
+                                            <span className='attendance-day-card__label'><FormattedMessage {...messages.device} /></span>
+                                            <span className='attendance-day-card__value' style={{fontSize: '11px'}}>{entry.checkin_device}</span>
+                                        </div>
+                                    )}
                                     <div className='attendance-day-card__row'>
                                         <span className='attendance-day-card__label'><FormattedMessage {...messages.checkOut} /></span>
                                         <span className='attendance-day-card__value'>{entry.check_out ? fmtTime(entry.check_out) : '—'}</span>
@@ -445,6 +470,12 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({user, filterMode, sele
                                             fileId={entry.checkout_image_id}
                                             size={80}
                                         />
+                                    )}
+                                    {entry.checkout_device && (
+                                        <div className='attendance-day-card__row'>
+                                            <span className='attendance-day-card__label'><FormattedMessage {...messages.device} /></span>
+                                            <span className='attendance-day-card__value' style={{fontSize: '11px'}}>{entry.checkout_device}</span>
+                                        </div>
                                     )}
                                     <div className='attendance-day-card__row'>
                                         <span className='attendance-day-card__label'><FormattedMessage {...messages.status} /></span>

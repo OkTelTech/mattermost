@@ -10,6 +10,8 @@ import classNames from 'classnames';
 import type {Team, TeamSearchOpts} from '@mattermost/types/teams';
 import {getTeams, searchTeams} from 'mattermost-redux/actions/teams';
 import type {ActionResult} from 'mattermost-redux/types/actions';
+import type {ChannelWithTeamData, ChannelSearchOpts} from '@mattermost/types/channels';
+import {Client4} from 'mattermost-redux/client';
 
 import Input from 'components/widgets/inputs/input/input';
 import InputError from 'components/input_error';
@@ -394,6 +396,105 @@ export function AttendanceReportTeamFilter({ filterTeam, filterTeamLabel, onChan
                 <InputError
                     message={error}
                 />
+            </div>
+        </div>
+    );
+}
+
+type ChannelFilterProps = {
+    filterTeam: string;
+    filterChannel: string;
+    filterChannelLabel?: string;
+    onChange: (id: string, label?: string) => void;
+}
+
+export function AttendanceReportChannelFilter({filterTeam, filterChannel, filterChannelLabel, onChange}: ChannelFilterProps) {
+    const {formatMessage} = useIntl();
+    const allChannelsOption = useMemo(() => ({
+        value: '',
+        label: formatMessage({id: 'analytics.attendance.allChannels', defaultMessage: 'All channels'}),
+    }), [formatMessage]);
+    const [error, setError] = useState('');
+    const [defaultOptions, setDefaultOptions] = useState<Options<OptionType>>();
+    const [value, setValue] = useState<OnChangeValue<OptionType, false>>(
+        filterChannel ? {value: filterChannel, label: filterChannelLabel || filterChannel} : allChannelsOption,
+    );
+    const teamID = (!filterTeam || filterTeam === 'teams_filter_for_all_teams') ? '' : filterTeam;
+
+    const searchChannels = useCallback(async (term: string): Promise<Options<OptionType>> => {
+        try {
+            const opts: ChannelSearchOpts = {};
+            if (teamID) {
+                opts.team_ids = [teamID];
+            }
+            const result = await Client4.searchAllChannels(term, opts);
+            const channels: ChannelWithTeamData[] = Array.isArray(result) ? result : ((result as any).channels ?? []);
+            const channelOpts = channels.map((ch) => ({
+                value: ch.id,
+                label: (!teamID && ch.team_display_name)
+                    ? `${ch.display_name || ch.name} (${ch.team_display_name})`
+                    : (ch.display_name || ch.name),
+            }));
+            return term ? channelOpts : [allChannelsOption, ...channelOpts];
+        } catch (err) {
+            setError(formatMessage({id: 'analytics.attendance.channelLoadError', defaultMessage: 'Error loading channels'}));
+            return [];
+        }
+    }, [teamID, allChannelsOption, formatMessage]);
+
+    useEffect(() => {
+        setValue(allChannelsOption);
+        onChange('');
+        searchChannels('').then(setDefaultOptions);
+    }, [teamID]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    function handleOnChange(val: OnChangeValue<OptionType, false>) {
+        setValue(val);
+        const typed = val as OptionType;
+        onChange(typed.value, typed.label as string);
+    }
+
+    const className = 'attendanceChannelFilter';
+
+    return (
+        <div className='system-users__filter' style={{minWidth: '200px'}}>
+            <div className='DropdownInput Input_container'>
+                <fieldset
+                    className={classNames('Input_fieldset Input_fieldset___legend', className, {
+                        Input_fieldset___error: error,
+                    })}
+                >
+                    <legend className='Input_legend Input_legend___focus'>
+                        {formatMessage({id: 'analytics.attendance.channelFilter', defaultMessage: 'Channel'})}
+                    </legend>
+                    <div className='Input_wrapper'>
+                        <AsyncSelect
+                            key={teamID}
+                            inputId='asyncChannelSelectInput'
+                            classNamePrefix='DropDown'
+                            className={classNames('Input Input__focus', className)}
+                            styles={styles}
+                            isMulti={false}
+                            isClearable={false}
+                            hideSelectedOptions={false}
+                            cacheOptions={false}
+                            placeholder={''}
+                            loadingMessage={() => formatMessage({id: 'analytics.attendance.channelLoading', defaultMessage: 'Loading channels...'})}
+                            noOptionsMessage={() => formatMessage({id: 'analytics.attendance.channelNoOptions', defaultMessage: 'No channels found'})}
+                            loadOptions={searchChannels}
+                            defaultOptions={defaultOptions}
+                            value={value}
+                            onChange={handleOnChange}
+                            components={{
+                                IndicatorsContainer,
+                                LoadingIndicator,
+                                Option,
+                                Control,
+                            }}
+                        />
+                    </div>
+                </fieldset>
+                <InputError message={error}/>
             </div>
         </div>
     );

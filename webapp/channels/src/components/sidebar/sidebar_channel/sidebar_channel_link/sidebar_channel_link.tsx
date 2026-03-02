@@ -42,6 +42,11 @@ type Props = WrappedComponentProps & {
     unreadMentions: number;
 
     /**
+     * Number of unread messages in this channel
+     */
+    unreadMsgs: number;
+
+    /**
      * Whether or not the channel is shown as unread
      */
     isUnread: boolean;
@@ -186,6 +191,7 @@ export class SidebarChannelLink extends React.PureComponent<Props, State> {
             label,
             link,
             unreadMentions,
+            unreadMsgs,
             firstChannelName,
             showChannelsTutorialStep,
             hasUrgent,
@@ -260,6 +266,7 @@ export class SidebarChannelLink extends React.PureComponent<Props, State> {
                 <ChannelPencilIcon id={channel.id}/>
                 <ChannelMentionBadge
                     unreadMentions={unreadMentions}
+                    unreadMsgs={unreadMsgs}
                     hasUrgent={hasUrgent}
                 />
                 <div

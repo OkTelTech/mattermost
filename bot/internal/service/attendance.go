@@ -3,16 +3,17 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
-	"go.mongodb.org/mongo-driver/v2/bson"
-
 	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
 	"oktel-bot/internal/store"
+	"strings"
+	"time"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
+
+var vnTZ = time.FixedZone("UTC+7", 7*60*60)
 
 type AttendanceService struct {
 	store  *store.AttendanceStore
@@ -32,7 +33,7 @@ type CheckInResult struct {
 
 func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID, device string) (*CheckInResult, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -40,7 +41,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 	}
 	if record != nil {
 		return nil, fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_in", map[string]any{
-			"Username": username, "Time": record.CheckIn.Format(time.TimeOnly),
+			"Username": username, "Time": record.CheckIn.In(vnTZ).Format(time.TimeOnly),
 		}))
 	}
 
@@ -96,7 +97,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 
 func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, reason, device string) (string, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -141,7 +142,7 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 
 func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username, device string) (string, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -188,7 +189,7 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username, devi
 
 func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, fileID, device string) (string, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -202,7 +203,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, file
 	}
 	if record.CheckOut != nil {
 		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_out", map[string]any{
-			"Username": username, "Time": record.CheckOut.Format(time.TimeOnly),
+			"Username": username, "Time": record.CheckOut.In(vnTZ).Format(time.TimeOnly),
 		}))
 	}
 
@@ -780,7 +781,7 @@ func validateDateList(ctx context.Context, dates []string) error {
 	if len(dates) == 0 {
 		return fmt.Errorf(i18n.T(ctx, "attendance.err.date_required"))
 	}
-	today := time.Now().Format(time.DateOnly)
+	today := time.Now().In(vnTZ).Format(time.DateOnly)
 	for _, d := range dates {
 		if _, err := time.Parse(time.DateOnly, d); err != nil {
 			return fmt.Errorf(i18n.T(ctx, "attendance.err.invalid_date", map[string]any{"Date": d}))

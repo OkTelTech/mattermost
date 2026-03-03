@@ -29,6 +29,30 @@ func (h *AttendanceHandler) isMobileRequest(r *http.Request) bool {
 	return h.blockMobile && r.Header.Get("X-Mattermost-Is-Mobile") == "true"
 }
 
+// deviceFromHeaders builds a device description from headers forwarded by the Mattermost server.
+// Example output: "Chrome/120.0 (Windows 10)" or "Mattermost Mobile (iPhone, iOS 17.2)".
+func deviceFromHeaders(r *http.Request) string {
+	browser := r.Header.Get("X-Mattermost-Browser")
+	platform := r.Header.Get("X-Mattermost-Platform")
+	os := r.Header.Get("X-Mattermost-Os")
+
+	if browser == "" && platform == "" && os == "" {
+		return ""
+	}
+
+	device := browser
+	switch {
+	case platform != "" && os != "":
+		device += " (" + platform + ", " + os + ")"
+	case platform != "":
+		device += " (" + platform + ")"
+	case os != "":
+		device += " (" + os + ")"
+	}
+
+	return strings.TrimSpace(device)
+}
+
 func (h *AttendanceHandler) denyMobileSlash(ctx context.Context, w http.ResponseWriter) {
 	writeJSON(w, SlashResponse{
 		ResponseType: "ephemeral",
@@ -289,8 +313,9 @@ func (h *AttendanceHandler) HandleCheckInSubmit(w http.ResponseWriter, r *http.R
 	}
 
 	fileID := sub.Submission["photo"]
+	device := deviceFromHeaders(r)
 
-	result, err := h.svc.CheckIn(ctx, sub.UserID, username, sub.ChannelID, fileID)
+	result, err := h.svc.CheckIn(ctx, sub.UserID, username, sub.ChannelID, fileID, device)
 	if err != nil {
 		log.Printf("ERROR check-in: %v", err)
 		writeJSON(w, map[string]string{"error": err.Error()})
@@ -318,8 +343,9 @@ func (h *AttendanceHandler) HandleBreakStart(w http.ResponseWriter, r *http.Requ
 	}
 
 	reasonKey, _ := req.Context["reason"].(string)
+	device := deviceFromHeaders(r)
 
-	msg, err := h.svc.BreakStart(ctx, req.UserID, req.UserName, reasonKey)
+	msg, err := h.svc.BreakStart(ctx, req.UserID, req.UserName, reasonKey, device)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
@@ -342,7 +368,8 @@ func (h *AttendanceHandler) HandleBreakEnd(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	msg, err := h.svc.BreakEnd(ctx, req.UserID, req.UserName)
+	device := deviceFromHeaders(r)
+	msg, err := h.svc.BreakEnd(ctx, req.UserID, req.UserName, device)
 	if err != nil {
 		writeJSON(w, ActionResponse{EphemeralText: err.Error()})
 		return
@@ -419,8 +446,9 @@ func (h *AttendanceHandler) HandleCheckOutSubmit(w http.ResponseWriter, r *http.
 	}
 
 	fileID := sub.Submission["photo"]
+	device := deviceFromHeaders(r)
 
-	_, err := h.svc.CheckOut(ctx, sub.UserID, username, fileID)
+	_, err := h.svc.CheckOut(ctx, sub.UserID, username, fileID, device)
 	if err != nil {
 		log.Printf("ERROR check-out: %v", err)
 		writeJSON(w, map[string]string{"error": err.Error()})
@@ -797,8 +825,8 @@ func (h *AttendanceHandler) HandleRejectSubmit(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
-// HandleReport returns attendance statistics filtered by date range and optionally by user and/or team.
-// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), user_id (optional), team_id (optional).
+// HandleReport returns attendance statistics filtered by date range and optionally by user, team and/or channel.
+// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), user_id (optional), team_id (optional), channel_id (optional).
 func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	from := q.Get("from")
@@ -808,7 +836,7 @@ func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	report, err := h.svc.GetReport(r.Context(), from, to, q.Get("user_id"), q.Get("team_id"))
+	report, err := h.svc.GetReport(r.Context(), from, to, q.Get("user_id"), q.Get("team_id"), q.Get("channel_id"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -818,7 +846,7 @@ func (h *AttendanceHandler) HandleReport(w http.ResponseWriter, r *http.Request)
 }
 
 // HandleStats returns aggregate attendance statistics for a date range.
-// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required).
+// Query params: from (YYYY-MM-DD, required), to (YYYY-MM-DD, required), channel_id (optional).
 func (h *AttendanceHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	from := q.Get("from")
@@ -828,7 +856,7 @@ func (h *AttendanceHandler) HandleStats(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	stats, err := h.svc.GetStats(r.Context(), from, to)
+	stats, err := h.svc.GetStats(r.Context(), from, to, q.Get("channel_id"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

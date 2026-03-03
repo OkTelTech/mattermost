@@ -557,6 +557,15 @@ func (a *App) DoCommandRequest(rctx request.CTX, cmd *model.Command, p url.Value
 	if isMobile := rctx.Session().Props[model.UserAuthServiceIsMobile]; isMobile != "" {
 		req.Header.Set("X-Mattermost-Is-Mobile", isMobile)
 	}
+	if platform := rctx.Session().Props[model.SessionPropPlatform]; platform != "" {
+		req.Header.Set("X-Mattermost-Platform", platform)
+	}
+	if os := rctx.Session().Props[model.SessionPropOs]; os != "" {
+		req.Header.Set("X-Mattermost-Os", os)
+	}
+	if browser := rctx.Session().Props[model.SessionPropBrowser]; browser != "" {
+		req.Header.Set("X-Mattermost-Browser", browser)
+	}
 
 	resp, err := a.Srv().outgoingWebhookClient.Do(req)
 	if err != nil {

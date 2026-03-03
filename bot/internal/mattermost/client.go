@@ -207,6 +207,32 @@ type ChannelInfo struct {
 	TeamID string `json:"team_id"`
 }
 
+// GetChannelMembers returns all members of a channel.
+func (c *Client) GetChannelMembers(channelID string) ([]ChannelMember, error) {
+	var members []ChannelMember
+	page := 0
+	perPage := 200
+	for {
+		var batch []ChannelMember
+		path := fmt.Sprintf("/api/v4/channels/%s/members?page=%d&per_page=%d", channelID, page, perPage)
+		if err := c.doJSON("GET", path, nil, &batch); err != nil {
+			return nil, fmt.Errorf("get channel members: %w", err)
+		}
+		members = append(members, batch...)
+		if len(batch) < perPage {
+			break
+		}
+		page++
+	}
+	return members, nil
+}
+
+// ChannelMember represents a member of a channel.
+type ChannelMember struct {
+	UserID    string `json:"user_id"`
+	ChannelID string `json:"channel_id"`
+}
+
 func (c *Client) doJSON(method, path string, body any, result any) error {
 	var reqBody io.Reader
 	if body != nil {

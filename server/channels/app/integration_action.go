@@ -333,6 +333,15 @@ func (a *App) DoActionRequest(rctx request.CTX, rawURL string, body []byte) (*ht
 	if isMobile := rctx.Session().Props[model.UserAuthServiceIsMobile]; isMobile != "" {
 		req.Header.Set("X-Mattermost-Is-Mobile", isMobile)
 	}
+	if platform := rctx.Session().Props[model.SessionPropPlatform]; platform != "" {
+		req.Header.Set("X-Mattermost-Platform", platform)
+	}
+	if os := rctx.Session().Props[model.SessionPropOs]; os != "" {
+		req.Header.Set("X-Mattermost-Os", os)
+	}
+	if browser := rctx.Session().Props[model.SessionPropBrowser]; browser != "" {
+		req.Header.Set("X-Mattermost-Browser", browser)
+	}
 
 	// Allow access to plugin routes for action buttons
 	var httpClient *http.Client

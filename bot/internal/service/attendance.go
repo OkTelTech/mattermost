@@ -3,16 +3,17 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
-	"go.mongodb.org/mongo-driver/v2/bson"
-
 	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
 	"oktel-bot/internal/store"
+	"strings"
+	"time"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
+
+var vnTZ = time.FixedZone("UTC+7", 7*60*60)
 
 type AttendanceService struct {
 	store  *store.AttendanceStore
@@ -30,9 +31,9 @@ type CheckInResult struct {
 	PostID  string
 }
 
-func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID string) (*CheckInResult, error) {
+func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID, device string) (*CheckInResult, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -40,7 +41,7 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 	}
 	if record != nil {
 		return nil, fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_in", map[string]any{
-			"Username": username, "Time": record.CheckIn.Format(time.TimeOnly),
+			"Username": username, "Time": record.CheckIn.In(vnTZ).Format(time.TimeOnly),
 		}))
 	}
 
@@ -51,13 +52,14 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 	}
 
 	record = &model.AttendanceRecord{
-		UserID:    userID,
-		Username:  username,
-		TeamID:    channelInfo.TeamID,
-		ChannelID: channelID,
-		Date:      date,
-		CheckIn:   &now,
-		Status:    model.AttendanceStatusWorking,
+		UserID:        userID,
+		Username:      username,
+		TeamID:        channelInfo.TeamID,
+		ChannelID:     channelID,
+		Date:          date,
+		CheckIn:       &now,
+		CheckInDevice: device,
+		Status:        model.AttendanceStatusWorking,
 	}
 	if err := s.store.CreateRecord(ctx, record); err != nil {
 		return nil, fmt.Errorf("create record: %w", err)
@@ -93,9 +95,9 @@ func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, chann
 	return &CheckInResult{Message: fmt.Sprintf("%s checked in at %s", username, now.Format(time.TimeOnly)), PostID: post.ID}, nil
 }
 
-func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, reason string) (string, error) {
+func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, reason, device string) (string, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -114,8 +116,9 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 	}
 
 	record.Breaks = append(record.Breaks, model.BreakRecord{
-		Start:  now,
-		Reason: reason,
+		Start:       now,
+		StartDevice: device,
+		Reason:      reason,
 	})
 	record.Status = model.AttendanceStatusBreak
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
@@ -137,9 +140,9 @@ func (s *AttendanceService) BreakStart(ctx context.Context, userID, username, re
 	return fmt.Sprintf("%s started break at %s", username, now.Format(time.TimeOnly)), nil
 }
 
-func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username string) (string, error) {
+func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username, device string) (string, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -155,6 +158,7 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 	// Close the last open break
 	last := &record.Breaks[len(record.Breaks)-1]
 	last.End = &now
+	last.EndDevice = device
 	breakDuration := now.Sub(last.Start)
 	record.Status = model.AttendanceStatusWorking
 	if err := s.store.UpdateRecord(ctx, record); err != nil {
@@ -183,9 +187,9 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username strin
 	return fmt.Sprintf("%s ended break at %s", username, now.Format(time.TimeOnly)), nil
 }
 
-func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, fileID string) (string, error) {
+func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, fileID, device string) (string, error) {
 	now := time.Now()
-	date := now.Format(time.DateOnly)
+	date := now.In(vnTZ).Format(time.DateOnly)
 
 	record, err := s.store.GetTodayRecord(ctx, userID, date)
 	if err != nil {
@@ -199,11 +203,12 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, file
 	}
 	if record.CheckOut != nil {
 		return "", fmt.Errorf(i18n.T(ctx, "attendance.msg.already_checked_out", map[string]any{
-			"Username": username, "Time": record.CheckOut.Format(time.TimeOnly),
+			"Username": username, "Time": record.CheckOut.In(vnTZ).Format(time.TimeOnly),
 		}))
 	}
 
 	record.CheckOut = &now
+	record.CheckOutDevice = device
 	record.Status = model.AttendanceStatusCompleted
 	if fileID != "" {
 		record.CheckOutImageID = fileID
@@ -257,13 +262,13 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, file
 		Props: mattermost.Props{
 			MessageKey: "attendance.msg.checked_out",
 			MessageData: map[string]any{
-				"Username":        username,
-				"TotalTime":       int(totalTime.Round(time.Second).Seconds()),
-				"ActualWorkTime":  int(actualWork.Round(time.Second).Seconds()),
-				"TotalBreakTime":  int(totalBreak.Round(time.Second).Seconds()),
-				"BreakCount":      len(record.Breaks),
-				"Breaks":          breaksData,
-				"FileID":          fileID,
+				"Username":       username,
+				"TotalTime":      int(totalTime.Round(time.Second).Seconds()),
+				"ActualWorkTime": int(actualWork.Round(time.Second).Seconds()),
+				"TotalBreakTime": int(totalBreak.Round(time.Second).Seconds()),
+				"BreakCount":     len(record.Breaks),
+				"Breaks":         breaksData,
+				"FileID":         fileID,
 			},
 		},
 	})
@@ -935,25 +940,29 @@ type UserReport struct {
 
 // BreakLog is a single break record with start/end times.
 type BreakLog struct {
-	Reason string `json:"reason"`
-	Start int64  `json:"start"`
-	End   int64  `json:"end,omitempty"`
+	Reason      string `json:"reason"`
+	Start       int64  `json:"start"`
+	StartDevice string `json:"start_device,omitempty"`
+	End         int64  `json:"end,omitempty"`
+	EndDevice   string `json:"end_device,omitempty"`
 }
 
 type AttendanceEntry struct {
-	Date             string     `json:"date"`
-	CheckIn          int64      `json:"check_in,omitempty"`
-	CheckInImageID   string     `json:"checkin_image_id,omitempty"`
-	CheckOut         int64      `json:"check_out,omitempty"`
-	CheckOutImageID  string     `json:"checkout_image_id,omitempty"`
-	Status           string     `json:"status"`
-	TotalBreaks    int        `json:"total_breaks"`
-	BreakRest      int        `json:"break_rest"`
-	BreakEat       int        `json:"break_eat"`
-	BreakRestroomS int        `json:"break_restroom_s"`
-	BreakRestroomL int        `json:"break_restroom_l"`
-	BreakSmoke     int        `json:"break_smoke"`
-	Breaks         []BreakLog `json:"breaks,omitempty"`
+	Date            string     `json:"date"`
+	CheckIn         int64      `json:"check_in,omitempty"`
+	CheckInImageID  string     `json:"checkin_image_id,omitempty"`
+	CheckInDevice   string     `json:"checkin_device,omitempty"`
+	CheckOut        int64      `json:"check_out,omitempty"`
+	CheckOutDevice  string     `json:"checkout_device,omitempty"`
+	CheckOutImageID string     `json:"checkout_image_id,omitempty"`
+	Status          string     `json:"status"`
+	TotalBreaks     int        `json:"total_breaks"`
+	BreakRest       int        `json:"break_rest"`
+	BreakEat        int        `json:"break_eat"`
+	BreakRestroomS  int        `json:"break_restroom_s"`
+	BreakRestroomL  int        `json:"break_restroom_l"`
+	BreakSmoke      int        `json:"break_smoke"`
+	Breaks          []BreakLog `json:"breaks,omitempty"`
 }
 
 type LeaveEntry struct {
@@ -964,8 +973,8 @@ type LeaveEntry struct {
 	Status       string   `json:"status"`
 }
 
-// GetReport returns attendance statistics for a date range, optionally filtered by user and/or team.
-func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, teamID string) (*AttendanceReport, error) {
+// GetReport returns attendance statistics for a date range, optionally filtered by user, team and/or channel.
+func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, teamID, channelID string) (*AttendanceReport, error) {
 	if _, err := time.Parse(time.DateOnly, from); err != nil {
 		return nil, fmt.Errorf("invalid 'from' date, use YYYY-MM-DD: %w", err)
 	}
@@ -976,12 +985,12 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 		return nil, fmt.Errorf("'from' must be before or equal to 'to'")
 	}
 
-	attendanceRecs, err := s.store.GetAttendanceByDateRange(ctx, from, to, userID, teamID)
+	attendanceRecs, err := s.store.GetAttendanceByDateRange(ctx, from, to, userID, teamID, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get attendance: %w", err)
 	}
 
-	leaveReqs, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, userID, teamID)
+	leaveReqs, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, userID, teamID, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get leave requests: %w", err)
 	}
@@ -1006,20 +1015,24 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 		if rec.CheckIn != nil {
 			entry.CheckIn = rec.CheckIn.Unix()
 			entry.CheckInImageID = rec.CheckInImageID
+			entry.CheckInDevice = rec.CheckInDevice
 		}
 		if rec.CheckOut != nil {
 			entry.CheckOut = rec.CheckOut.Unix()
+			entry.CheckOutDevice = rec.CheckOutDevice
 			entry.CheckOutImageID = rec.CheckOutImageID
 		}
 
 		for _, b := range rec.Breaks {
 			entry.TotalBreaks++
 			log := BreakLog{
-				Reason: b.Reason,
-				Start:  b.Start.Unix(),
+				Reason:      b.Reason,
+				Start:       b.Start.Unix(),
+				StartDevice: b.StartDevice,
 			}
 			if b.End != nil {
 				log.End = b.End.Unix()
+				log.EndDevice = b.EndDevice
 			}
 			entry.Breaks = append(entry.Breaks, log)
 			switch b.Reason {
@@ -1085,20 +1098,20 @@ func (s *AttendanceService) GetReport(ctx context.Context, from, to, userID, tea
 
 // AttendanceStats contains aggregate counts for a date range.
 type AttendanceStats struct {
-	From                  string `json:"from"`
-	To                    string `json:"to"`
-	TotalCheckedIn        int    `json:"total_checked_in"`
-	TotalWorking          int    `json:"total_working"`
-	TotalOnBreak          int    `json:"total_on_break"`
-	TotalCheckedOut       int    `json:"total_checked_out"`
-	TotalOnLeave          int    `json:"total_on_leave"`
-	TotalLateArrival      int    `json:"total_late_arrivals"`
-	TotalEarlyDepart      int    `json:"total_early_departures"`
-	PendingRequests       int    `json:"pending_requests"`
+	From             string `json:"from"`
+	To               string `json:"to"`
+	TotalCheckedIn   int    `json:"total_checked_in"`
+	TotalWorking     int    `json:"total_working"`
+	TotalOnBreak     int    `json:"total_on_break"`
+	TotalCheckedOut  int    `json:"total_checked_out"`
+	TotalOnLeave     int    `json:"total_on_leave"`
+	TotalLateArrival int    `json:"total_late_arrivals"`
+	TotalEarlyDepart int    `json:"total_early_departures"`
+	PendingRequests  int    `json:"pending_requests"`
 }
 
-// GetAttendanceStats returns aggregate attendance counts for a date range.
-func (s *AttendanceService) GetStats(ctx context.Context, from, to string) (*AttendanceStats, error) {
+// GetAttendanceStats returns aggregate attendance counts for a date range, optionally filtered by channel.
+func (s *AttendanceService) GetStats(ctx context.Context, from, to, channelID string) (*AttendanceStats, error) {
 	if _, err := time.Parse(time.DateOnly, from); err != nil {
 		return nil, fmt.Errorf("invalid 'from' date, use YYYY-MM-DD: %w", err)
 	}
@@ -1109,12 +1122,12 @@ func (s *AttendanceService) GetStats(ctx context.Context, from, to string) (*Att
 		return nil, fmt.Errorf("'from' must be before or equal to 'to'")
 	}
 
-	records, err := s.store.GetAttendanceByDateRange(ctx, from, to, "", "")
+	records, err := s.store.GetAttendanceByDateRange(ctx, from, to, "", "", channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get attendance: %w", err)
 	}
 
-	leaves, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, "", "")
+	leaves, err := s.store.GetLeaveRequestsByDateRange(ctx, from, to, "", "", channelID)
 	if err != nil {
 		return nil, fmt.Errorf("get leave requests: %w", err)
 	}
@@ -1163,7 +1176,7 @@ func validateDateList(ctx context.Context, dates []string) error {
 	if len(dates) == 0 {
 		return fmt.Errorf(i18n.T(ctx, "attendance.err.date_required"))
 	}
-	today := time.Now().Format(time.DateOnly)
+	today := time.Now().In(vnTZ).Format(time.DateOnly)
 	for _, d := range dates {
 		if _, err := time.Parse(time.DateOnly, d); err != nil {
 			return fmt.Errorf(i18n.T(ctx, "attendance.err.invalid_date", map[string]any{"Date": d}))

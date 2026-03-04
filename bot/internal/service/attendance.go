@@ -540,7 +540,7 @@ func (s *AttendanceService) GetUserFutureLeaves(ctx context.Context, userID stri
 	return s.store.FindFutureLeaveRequestsByUser(ctx, userID, today)
 }
 
-func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID string, userID string, oldDate, newDate, changeReason string) error {
+func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID string, userID string, oldDate, newDate, changeReason, approver string) error {
 	id, err := bson.ObjectIDFromHex(requestID)
 	if err != nil {
 		return fmt.Errorf("invalid request ID: %w", err)
@@ -636,10 +636,14 @@ func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID str
 		})
 
 		// Update existing approval post (keep buttons)
-		msgData["Mention"] = "@all"
+		mention := "@all"
+		if approver != "" {
+			mention = "@" + approver
+		}
+		msgData["Mention"] = mention
 		s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
 			ChannelID: req.ApprovalChannelID,
-			Message:   "@all",
+			Message:   mention,
 			Props: mattermost.Props{
 				MessageKey:  msgKey,
 				MessageData: msgData,
@@ -714,10 +718,14 @@ func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID str
 	}
 
 	// Create NEW approval post in approval channel (with buttons)
-	changeMsgData["Mention"] = "@all"
+	changeMention := "@all"
+	if approver != "" {
+		changeMention = "@" + approver
+	}
+	changeMsgData["Mention"] = changeMention
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: req.ApprovalChannelID,
-		Message:   "@all",
+		Message:   changeMention,
 		Props: mattermost.Props{
 			MessageKey:  changeMsgKey,
 			MessageData: changeMsgData,

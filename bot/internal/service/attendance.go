@@ -32,6 +32,10 @@ type CheckInResult struct {
 }
 
 func (s *AttendanceService) CheckIn(ctx context.Context, userID, username, channelID, fileID, device string) (*CheckInResult, error) {
+	if fileID == "" {
+		return nil, fmt.Errorf(i18n.T(ctx, "attendance.err.photo_required"))
+	}
+
 	now := time.Now()
 	date := now.In(vnTZ).Format(time.DateOnly)
 
@@ -188,6 +192,10 @@ func (s *AttendanceService) BreakEnd(ctx context.Context, userID, username, devi
 }
 
 func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, fileID, device string) (string, error) {
+	if fileID == "" {
+		return "", fmt.Errorf(i18n.T(ctx, "attendance.err.photo_required"))
+	}
+
 	now := time.Now()
 	date := now.In(vnTZ).Format(time.DateOnly)
 

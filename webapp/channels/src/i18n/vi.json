@@ -3350,6 +3350,7 @@
   "integrations.successful": "Kiểm tra thành công",
   "interactive_dialog.cancel": "Hủy",
   "interactive_dialog.element.optional": "(không bắt buộc)",
+  "interactive_dialog.error.required": "Trường này là bắt buộc.",
   "interactive_dialog.submit": "Xác Nhận",
   "interactive_dialog.submitting": "Đang xác nhận...",
   "intro_messages.DM": "Đây là phần bắt đầu lịch sử tin nhắn trực tiếp của bạn với {thành viên}.\nTệp và tin nhắn trực tiếp được chia sẻ ở đây sẽ không hiển thị với những người bên ngoài khu vực này.",

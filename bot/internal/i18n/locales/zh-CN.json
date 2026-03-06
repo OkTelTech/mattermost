@@ -23,7 +23,7 @@
   "attendance.dialog.checkout_title": "签退",
   "attendance.dialog.checkout_submit": "签退",
   "attendance.field.photo": "照片",
-  "attendance.helptext.photo": "附上签到照片（可选）",
+  "attendance.helptext.photo": "附上打卡照片（必填）",
   "attendance.dialog.leave_title": "请假申请",
   "attendance.dialog.late_title": "迟到申请",
   "attendance.dialog.early_title": "早退申请",
@@ -48,6 +48,7 @@
   "attendance.err.open_form": "无法打开表单，请重试。",
   "attendance.err.missing_id": "缺少申请 ID",
   "attendance.err.mobile_blocked": "无法在手机上打卡，请使用电脑。",
+  "attendance.err.photo_required": "打卡需要上传照片",
 
   "attendance.msg.checked_in": "@{{.Username}} 已签到",
   "attendance.msg.already_checked_in": "@{{.Username}} 今天已于 {{.Time}} 签到",

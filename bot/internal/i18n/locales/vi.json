@@ -23,7 +23,7 @@
   "attendance.dialog.checkout_title": "Tan làm",
   "attendance.dialog.checkout_submit": "Tan làm",
   "attendance.field.photo": "Ảnh",
-  "attendance.helptext.photo": "Đính kèm ảnh vào ca (tùy chọn)",
+  "attendance.helptext.photo": "Đính kèm ảnh vào ca (bắt buộc)",
   "attendance.dialog.leave_title": "Yêu cầu nghỉ phép",
   "attendance.dialog.late_title": "Yêu cầu đi muộn",
   "attendance.dialog.early_title": "Yêu cầu về sớm",
@@ -48,6 +48,7 @@
   "attendance.err.open_form": "Không thể mở biểu mẫu. Vui lòng thử lại.",
   "attendance.err.missing_id": "Thiếu mã yêu cầu",
   "attendance.err.mobile_blocked": "Không thể chấm công trên điện thoại. Vui lòng sử dụng máy tính.",
+  "attendance.err.photo_required": "Bắt buộc phải có ảnh để chấm công",
 
   "attendance.msg.checked_in": "@{{.Username}} đã vào ca",
   "attendance.msg.already_checked_in": "@{{.Username}} đã vào ca hôm nay lúc {{.Time}}",

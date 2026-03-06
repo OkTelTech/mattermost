@@ -4,8 +4,10 @@
 import type {ChangeEvent} from 'react';
 import React, {useCallback, useRef, useState} from 'react';
 import {useIntl} from 'react-intl';
+import {useSelector} from 'react-redux';
 
 import {Client4} from 'mattermost-redux/client';
+import {getConfig} from 'mattermost-redux/selectors/entities/general';
 
 import Setting from 'components/widgets/settings/setting';
 
@@ -29,6 +31,7 @@ const FileUploadSetting = ({
     onChange,
 }: Props) => {
     const intl = useIntl();
+    const config = useSelector(getConfig);
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
     const [fileName, setFileName] = useState('');
@@ -52,13 +55,50 @@ const FileUploadSetting = ({
         }
 
         try {
-            const formData = new FormData();
-            formData.append('files', file);
-            formData.append('channel_id', channelId);
+            if (config.EnablePresignedFileUploads === 'true') {
+                // Presigned upload: 3-step flow
+                const session = await Client4.createUploadSession({
+                    channel_id: channelId,
+                    filename: file.name,
+                    file_size: file.size,
+                });
 
-            const response = await Client4.uploadFile(formData);
-            if (response.file_infos && response.file_infos.length > 0) {
-                onChange(id, response.file_infos[0].id);
+                if (session.presigned_url) {
+                    // PUT file directly to storage
+                    const putResponse = await fetch(session.presigned_url, {
+                        method: 'PUT',
+                        headers: {'Content-Type': file.type || 'application/octet-stream'},
+                        body: file,
+                    });
+
+                    if (!putResponse.ok) {
+                        throw new Error('Storage upload failed');
+                    }
+
+                    // Complete the upload on server
+                    const fileInfo = await Client4.completePresignedUpload(session.id);
+                    onChange(id, fileInfo.id);
+                } else {
+                    // Presigned URL not available, fallback to legacy
+                    const formData = new FormData();
+                    formData.append('files', file);
+                    formData.append('channel_id', channelId);
+
+                    const response = await Client4.uploadFile(formData);
+                    if (response.file_infos && response.file_infos.length > 0) {
+                        onChange(id, response.file_infos[0].id);
+                    }
+                }
+            } else {
+                // Legacy upload
+                const formData = new FormData();
+                formData.append('files', file);
+                formData.append('channel_id', channelId);
+
+                const response = await Client4.uploadFile(formData);
+                if (response.file_infos && response.file_infos.length > 0) {
+                    onChange(id, response.file_infos[0].id);
+                }
             }
         } catch {
             setError(intl.formatMessage({
@@ -71,7 +111,7 @@ const FileUploadSetting = ({
         } finally {
             setUploading(false);
         }
-    }, [channelId, id, onChange, intl]);
+    }, [channelId, id, onChange, intl, config.EnablePresignedFileUploads]);
 
     const handleRemove = useCallback(() => {
         setFileName('');

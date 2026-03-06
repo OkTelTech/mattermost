@@ -23,7 +23,7 @@
   "attendance.dialog.checkout_title": "Check Out",
   "attendance.dialog.checkout_submit": "Check Out",
   "attendance.field.photo": "Photo",
-  "attendance.helptext.photo": "Attach a photo to your check-in (optional)",
+  "attendance.helptext.photo": "Attach a photo to your attendance (required)",
   "attendance.dialog.leave_title": "Leave Request",
   "attendance.dialog.late_title": "Late Arrival Request",
   "attendance.dialog.early_title": "Early Departure Request",
@@ -51,6 +51,7 @@
   "attendance.err.open_form": "Failed to open form. Please try again.",
   "attendance.err.missing_id": "Missing request ID",
   "attendance.err.mobile_blocked": "Attendance is not available on mobile devices. Please use a computer.",
+  "attendance.err.photo_required": "Photo is required for attendance",
 
   "attendance.msg.checked_in": "@{{.Username}} checked in",
   "attendance.msg.already_checked_in": "@{{.Username}} already checked in today at {{.Time}}",

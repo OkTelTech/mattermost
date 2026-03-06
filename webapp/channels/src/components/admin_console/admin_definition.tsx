@@ -1235,6 +1235,37 @@ const AdminDefinition: AdminDefinitionType = {
                             ),
                         },
                         {
+                            type: 'bool',
+                            key: 'FileSettings.EnablePresignedFileDownloads',
+                            label: defineMessage({id: 'admin.image.enablePresignedFileDownloadsTitle', defaultMessage: 'Enable Presigned File Downloads:'}),
+                            help_text: defineMessage({id: 'admin.image.enablePresignedFileDownloadsDescription', defaultMessage: 'When true, file downloads use presigned URLs to serve files directly from storage (S3/GCS), bypassing the server proxy. Reduces server load and improves download speed.'}),
+                            isDisabled: it.any(
+                                it.not(it.userHasWritePermissionOnResource(RESOURCE_KEYS.ENVIRONMENT.FILE_STORAGE)),
+                                it.not(it.stateEquals('FileSettings.DriverName', FILE_STORAGE_DRIVER_S3)),
+                            ),
+                        },
+                        {
+                            type: 'bool',
+                            key: 'FileSettings.EnablePresignedFileUploads',
+                            label: defineMessage({id: 'admin.image.enablePresignedFileUploadsTitle', defaultMessage: 'Enable Presigned File Uploads:'}),
+                            help_text: defineMessage({id: 'admin.image.enablePresignedFileUploadsDescription', defaultMessage: 'When true, file uploads use presigned URLs to upload files directly to storage (S3/GCS), bypassing the server proxy. Reduces server load and improves upload speed. Requires CORS configuration on the storage bucket.'}),
+                            isDisabled: it.any(
+                                it.not(it.userHasWritePermissionOnResource(RESOURCE_KEYS.ENVIRONMENT.FILE_STORAGE)),
+                                it.not(it.stateEquals('FileSettings.DriverName', FILE_STORAGE_DRIVER_S3)),
+                            ),
+                        },
+                        {
+                            type: 'number',
+                            key: 'FileSettings.AmazonS3PresignExpiresSeconds',
+                            label: defineMessage({id: 'admin.image.amazonS3PresignExpiresSecondsTitle', defaultMessage: 'Presigned URL Expiry (seconds):'}),
+                            help_text: defineMessage({id: 'admin.image.amazonS3PresignExpiresSecondsDescription', defaultMessage: 'The number of seconds before a presigned URL expires. Default is 21600 (6 hours).'}),
+                            placeholder: defineMessage({id: 'admin.image.amazonS3PresignExpiresSecondsExample', defaultMessage: 'E.g.: "21600"'}),
+                            isDisabled: it.any(
+                                it.not(it.userHasWritePermissionOnResource(RESOURCE_KEYS.ENVIRONMENT.FILE_STORAGE)),
+                                it.not(it.stateEquals('FileSettings.DriverName', FILE_STORAGE_DRIVER_S3)),
+                            ),
+                        },
+                        {
                             type: 'button',
                             action: testS3Connection,
                             key: 'TestS3Connection',

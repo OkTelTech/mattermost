@@ -283,7 +283,7 @@ func (s *AttendanceService) CheckOut(ctx context.Context, userID, username, file
 	return fmt.Sprintf("%s checked out at %s", username, now.Format(time.TimeOnly)), nil
 }
 
-func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr string) error {
+func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, username, channelID string, leaveType model.LeaveType, dates []string, reason, timeStr, approver string) error {
 	// Lookup username if not provided (dialog submissions may omit it)
 	if username == "" {
 		user, err := s.mm.GetUser(userID)
@@ -303,9 +303,19 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 		return fmt.Errorf("check existing leaves: %w", err)
 	}
 	for _, e := range existing {
-		if e.Type == leaveType && (e.Status == model.LeaveStatusPending || e.Status == model.LeaveStatusApproved) {
-			overlap := findOverlap(dates, e.Dates)
-			return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": strings.Join(overlap, ", ")}))
+		if e.Type == leaveType && (e.Status == model.LeaveStatusPending || e.Status == model.LeaveStatusApproved || e.Status == model.LeaveStatusPendingChange) {
+			checkDates := e.Dates
+			if e.Status == model.LeaveStatusPendingChange && e.NewDate != "" {
+				checkDates = append(append([]string{}, checkDates...), e.NewDate)
+			}
+			overlap := findOverlap(dates, checkDates)
+			if len(overlap) > 0 {
+				displayOverlap := make([]string, len(overlap))
+				for i, d := range overlap {
+					displayOverlap[i] = model.FormatDateDisplay(d)
+				}
+				return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": strings.Join(displayOverlap, ", ")}))
+			}
 		}
 	}
 
@@ -359,9 +369,14 @@ func (s *AttendanceService) CreateLeaveRequest(ctx context.Context, userID, user
 	}
 
 	// Post approval message to approval channel (with buttons)
+	mention := "@all"
+	if approver != "" {
+		mention = "@" + approver
+	}
+	msgData["Mention"] = mention
 	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
 		ChannelID: approvalChannelID,
-		Message:   "@all",
+		Message:   mention,
 		Props: mattermost.Props{
 			MessageKey:  msgKey,
 			MessageData: msgData,
@@ -525,6 +540,386 @@ func (s *AttendanceService) RejectLeave(ctx context.Context, requestID, rejecter
 	})
 
 	return nil
+}
+
+// GetUserFutureLeaves returns leave requests that have at least one future date.
+func (s *AttendanceService) GetUserFutureLeaves(ctx context.Context, userID string) ([]model.LeaveRequest, error) {
+	today := time.Now().Format(time.DateOnly)
+	return s.store.FindFutureLeaveRequestsByUser(ctx, userID, today)
+}
+
+func (s *AttendanceService) RequestDateChange(ctx context.Context, requestID string, userID string, oldDate, newDate, changeReason string) error {
+	id, err := bson.ObjectIDFromHex(requestID)
+	if err != nil {
+		return fmt.Errorf("invalid request ID: %w", err)
+	}
+
+	req, err := s.store.GetLeaveRequestByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get leave request: %w", err)
+	}
+	if req == nil {
+		return fmt.Errorf(i18n.T(ctx, "attendance.err.not_found"))
+	}
+	if req.UserID != userID {
+		return fmt.Errorf(i18n.T(ctx, "attendance.err.change_not_owner"))
+	}
+	if req.Status != model.LeaveStatusPending && req.Status != model.LeaveStatusApproved {
+		return fmt.Errorf(i18n.T(ctx, "attendance.err.change_invalid_status", map[string]any{"Status": string(req.Status)}))
+	}
+
+	// Verify oldDate is in the request's dates and is in the future
+	today := time.Now().Format(time.DateOnly)
+	found := false
+	for _, d := range req.Dates {
+		if d == oldDate {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf(i18n.T(ctx, "attendance.err.change_past_dates"))
+	}
+	if oldDate < today {
+		return fmt.Errorf(i18n.T(ctx, "attendance.err.change_past_dates"))
+	}
+
+	// Validate new date
+	if err := validateDateList(ctx, []string{newDate}); err != nil {
+		return err
+	}
+
+	// Check if new date overlaps with other dates in the same request (excluding the old date)
+	for _, d := range req.Dates {
+		if d != oldDate && d == newDate {
+			return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": model.FormatDateDisplay(newDate)}))
+		}
+	}
+
+	// Check overlap of new date against other leave requests (exclude self)
+	existing, err := s.store.FindLeaveRequestsByUserAndDates(ctx, userID, []string{newDate})
+	if err != nil {
+		return fmt.Errorf("check existing leaves: %w", err)
+	}
+	for _, e := range existing {
+		if e.ID == req.ID {
+			continue
+		}
+		if e.Status == model.LeaveStatusPending || e.Status == model.LeaveStatusApproved || e.Status == model.LeaveStatusPendingChange {
+			checkDates := e.Dates
+			if e.Status == model.LeaveStatusPendingChange && e.NewDate != "" {
+				checkDates = append(append([]string{}, checkDates...), e.NewDate)
+			}
+			overlap := findOverlap([]string{newDate}, checkDates)
+			if len(overlap) > 0 {
+				return fmt.Errorf(i18n.T(ctx, "attendance.err.duplicate_leave", map[string]any{"Dates": model.FormatDateDisplay(newDate)}))
+			}
+		}
+	}
+
+	if req.Status == model.LeaveStatusPending {
+		// Pending: directly apply the change and update existing posts
+		for i, d := range req.Dates {
+			if d == oldDate {
+				req.Dates[i] = newDate
+				break
+			}
+		}
+
+		if err := s.store.UpdateLeaveRequest(ctx, req); err != nil {
+			return fmt.Errorf("update leave request: %w", err)
+		}
+
+		msgKey := leaveMessageKey(req.Type)
+		msgData := leaveMessageData(req.Username, req.Type, req.Dates, req.Reason, req.ExpectedTime, string(req.Status))
+
+		// Update existing info post in main channel
+		s.mm.UpdatePost(req.PostID, &mattermost.Post{
+			ChannelID: req.ChannelID,
+			Message:   "@" + req.Username,
+			Props: mattermost.Props{
+				MessageKey:  msgKey,
+				MessageData: msgData,
+			},
+		})
+
+		// Update existing approval post (keep buttons)
+		msgData["Mention"] = "@all"
+		s.mm.UpdatePost(req.ApprovalPostID, &mattermost.Post{
+			ChannelID: req.ApprovalChannelID,
+			Message:   "@all",
+			Props: mattermost.Props{
+				MessageKey:  msgKey,
+				MessageData: msgData,
+				Attachments: []mattermost.Attachment{{
+					Actions: []mattermost.Action{
+						{
+							Name: i18n.T(ctx, "attendance.btn.approve"),
+							Type: "button",
+							Integration: mattermost.Integration{
+								URL:     s.botURL + "/api/attendance/approve",
+								Context: map[string]any{"request_id": req.ID.Hex()},
+							},
+						},
+						{
+							Name: i18n.T(ctx, "attendance.btn.reject"),
+							Type: "button",
+							Integration: mattermost.Integration{
+								URL:     s.botURL + "/api/attendance/reject",
+								Context: map[string]any{"request_id": req.ID.Hex()},
+							},
+						},
+					},
+				}},
+			},
+		})
+
+		// Thread reply on approval post to notify about the change
+		s.mm.CreatePost(&mattermost.Post{
+			ChannelID: req.ApprovalChannelID,
+			RootID:    req.ApprovalPostID,
+			Message: i18n.T(ctx, "attendance.msg.date_changed", map[string]any{
+				"Username":     req.Username,
+				"OldDate":      model.FormatDateDisplay(oldDate),
+				"NewDate":      model.FormatDateDisplay(newDate),
+				"ChangeReason": changeReason,
+			}),
+		})
+
+		return nil
+	}
+
+	// Approved: create new approval posts for the date change
+	req.PreviousStatus = req.Status
+	req.Status = model.LeaveStatusPendingChange
+	req.OldDate = oldDate
+	req.NewDate = newDate
+	req.ChangeReason = changeReason
+	req.ApproverID = ""
+	req.ApproverUsername = ""
+	req.ApprovedAt = nil
+	req.RejectReason = ""
+
+	if err := s.store.UpdateLeaveRequest(ctx, req); err != nil {
+		return fmt.Errorf("update leave request: %w", err)
+	}
+
+	idHex := req.ID.Hex()
+	changeMsgKey := "leave.msg.change_leave"
+	changeMsgData := leaveChangeMessageData(req.Username, oldDate, newDate, req.Reason, changeReason, string(req.Status))
+
+	// Create NEW info post in main channel (no buttons)
+	infoPost, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.ChannelID,
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey:  changeMsgKey,
+			MessageData: changeMsgData,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("post change info message: %w", err)
+	}
+
+	// Create NEW approval post in approval channel (with buttons)
+	changeMsgData["Mention"] = "@all"
+	approvalPost, err := s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.ApprovalChannelID,
+		Message:   "@all",
+		Props: mattermost.Props{
+			MessageKey:  changeMsgKey,
+			MessageData: changeMsgData,
+			Attachments: []mattermost.Attachment{{
+				Actions: []mattermost.Action{
+					{
+						Name: i18n.T(ctx, "attendance.btn.approve_change"),
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/attendance/change-approve",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+					{
+						Name: i18n.T(ctx, "attendance.btn.reject_change"),
+						Type: "button",
+						Integration: mattermost.Integration{
+							URL:     s.botURL + "/api/attendance/change-reject",
+							Context: map[string]any{"request_id": idHex},
+						},
+					},
+				},
+			}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("post change approval message: %w", err)
+	}
+
+	req.ChangePostID = infoPost.ID
+	req.ChangeApprovalPostID = approvalPost.ID
+	return s.store.UpdateLeaveRequest(ctx, req)
+}
+
+func (s *AttendanceService) ApproveDateChange(ctx context.Context, requestID, approverID, approverUsername string) (*LeaveUpdateResult, error) {
+	id, err := bson.ObjectIDFromHex(requestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request ID: %w", err)
+	}
+
+	req, err := s.store.GetLeaveRequestByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get leave request: %w", err)
+	}
+	if req == nil {
+		return nil, fmt.Errorf(i18n.T(ctx, "attendance.err.not_found"))
+	}
+	if req.Status != model.LeaveStatusPendingChange {
+		return nil, fmt.Errorf(i18n.T(ctx, "attendance.err.not_pending_change"))
+	}
+
+	now := time.Now()
+	// Save change info before clearing
+	oldDate := req.OldDate
+	newDate := req.NewDate
+	changeReason := req.ChangeReason
+
+	// Replace the old date with the new date in the dates array
+	for i, d := range req.Dates {
+		if d == req.OldDate {
+			req.Dates[i] = req.NewDate
+			break
+		}
+	}
+	req.Status = model.LeaveStatusApproved
+	req.ApproverID = approverID
+	req.ApproverUsername = approverUsername
+	req.ApprovedAt = &now
+	req.OldDate = ""
+	req.NewDate = ""
+	req.ChangeReason = ""
+	req.PreviousStatus = ""
+
+	if err := s.store.UpdateLeaveRequest(ctx, req); err != nil {
+		return nil, fmt.Errorf("update leave request: %w", err)
+	}
+
+	// Keep the change message format, just update status
+	changeMsgKey := "leave.msg.change_leave"
+	changeMsgData := leaveChangeMessageData(req.Username, oldDate, newDate, req.Reason, changeReason, string(req.Status))
+
+	// Update change info post (same format, updated status)
+	s.mm.UpdatePost(req.ChangePostID, &mattermost.Post{
+		ChannelID: req.ChannelID,
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey:  changeMsgKey,
+			MessageData: changeMsgData,
+		},
+	})
+
+	// Thread reply on change post to notify requester
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.ChannelID,
+		RootID:    req.ChangePostID,
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey: "attendance.msg.change_approved",
+			MessageData: map[string]any{
+				"Username": req.Username,
+				"Approver": approverUsername,
+			},
+		},
+	})
+
+	// Return result to update the approval post (remove buttons, keep change format)
+	return &LeaveUpdateResult{MessageKey: changeMsgKey, MessageData: changeMsgData}, nil
+}
+
+func (s *AttendanceService) RejectDateChange(ctx context.Context, requestID, rejecterID, rejecterUsername, reason string) error {
+	id, err := bson.ObjectIDFromHex(requestID)
+	if err != nil {
+		return fmt.Errorf("invalid request ID: %w", err)
+	}
+
+	req, err := s.store.GetLeaveRequestByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get leave request: %w", err)
+	}
+	if req == nil {
+		return fmt.Errorf(i18n.T(ctx, "attendance.err.not_found"))
+	}
+	if req.Status != model.LeaveStatusPendingChange {
+		return fmt.Errorf(i18n.T(ctx, "attendance.err.not_pending_change"))
+	}
+
+	// Save change info before clearing
+	oldDate := req.OldDate
+	newDate := req.NewDate
+	changeReason := req.ChangeReason
+
+	// Restore previous status
+	req.Status = req.PreviousStatus
+	req.OldDate = ""
+	req.NewDate = ""
+	req.ChangeReason = ""
+	req.PreviousStatus = ""
+
+	if err := s.store.UpdateLeaveRequest(ctx, req); err != nil {
+		return fmt.Errorf("update leave request: %w", err)
+	}
+
+	// Keep the change message format, just update status to rejected
+	changeMsgKey := "leave.msg.change_leave"
+	changeMsgData := leaveChangeMessageData(req.Username, oldDate, newDate, req.Reason, changeReason, string(model.LeaveStatusRejected))
+
+	// Update change info post (same format, show rejected)
+	s.mm.UpdatePost(req.ChangePostID, &mattermost.Post{
+		ChannelID: req.ChannelID,
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey:  changeMsgKey,
+			MessageData: changeMsgData,
+		},
+	})
+
+	// Update change approval post (remove buttons, keep change format)
+	s.mm.UpdatePost(req.ChangeApprovalPostID, &mattermost.Post{
+		ChannelID: req.ApprovalChannelID,
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey:  changeMsgKey,
+			MessageData: changeMsgData,
+			Attachments: []mattermost.Attachment{},
+		},
+	})
+
+	// Thread reply on change post to notify requester
+	s.mm.CreatePost(&mattermost.Post{
+		ChannelID: req.ChannelID,
+		RootID:    req.ChangePostID,
+		Message:   "@" + req.Username,
+		Props: mattermost.Props{
+			MessageKey: "attendance.msg.change_rejected",
+			MessageData: map[string]any{
+				"Username": req.Username,
+				"Approver": rejecterUsername,
+				"Reason":   reason,
+			},
+		},
+	})
+
+	return nil
+}
+
+func leaveChangeMessageData(username, oldDate, newDate, reason, changeReason, status string) map[string]any {
+	return map[string]any{
+		"Username":     username,
+		"OldDate":      model.FormatDateDisplay(oldDate),
+		"NewDate":      model.FormatDateDisplay(newDate),
+		"Reason":       reason,
+		"ChangeReason": changeReason,
+		"Status":       status,
+	}
 }
 
 // AttendanceReport is the top-level response for the report API.
@@ -833,15 +1228,20 @@ func leaveMessageKey(leaveType model.LeaveType) string {
 }
 
 func leaveMessageData(username string, leaveType model.LeaveType, dates []string, reason, timeStr, status string) map[string]any {
+	displayDates := make([]string, len(dates))
+	for i, d := range dates {
+		displayDates[i] = model.FormatDateDisplay(d)
+	}
 	return map[string]any{
 		"Username":     username,
 		"LeaveType":    string(leaveType),
-		"Dates":        strings.Join(dates, ", "),
+		"Dates":        strings.Join(displayDates, ", "),
 		"Reason":       reason,
 		"ExpectedTime": timeStr,
 		"Status":       status,
 	}
 }
+
 
 func formatDuration(ctx context.Context, d time.Duration) string {
 	d = d.Round(time.Second)

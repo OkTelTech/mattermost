@@ -10,6 +10,7 @@ import {FileTypes} from 'mattermost-redux/action_types';
 import {getLogErrorAction} from 'mattermost-redux/actions/errors';
 import {forceLogoutIfNecessary} from 'mattermost-redux/actions/helpers';
 import {Client4} from 'mattermost-redux/client';
+import {getConfig} from 'mattermost-redux/selectors/entities/general';
 
 import type {FilePreviewInfo} from 'components/file_preview/file_preview';
 
@@ -31,6 +32,11 @@ export interface UploadFile {
 
 export function uploadFile({file, name, type, rootId, channelId, clientId, onProgress, onSuccess, onError}: UploadFile, isBookmark?: boolean): ThunkActionFunc<XMLHttpRequest> {
     return (dispatch, getState) => {
+        const config = getConfig(getState());
+        if (!isBookmark && config.EnablePresignedFileUploads === 'true') {
+            return uploadFilePresigned({file, name, type, rootId, channelId, clientId, onProgress, onSuccess, onError})(dispatch, getState);
+        }
+
         dispatch({type: FileTypes.UPLOAD_FILES_REQUEST});
 
         let url = Client4.getFilesRoute();
@@ -149,6 +155,82 @@ export function uploadFile({file, name, type, rootId, channelId, clientId, onPro
         }
 
         xhr.send(formData);
+
+        return xhr;
+    };
+}
+
+function uploadFilePresigned({file, name, type, rootId, channelId, clientId, onProgress, onSuccess, onError}: UploadFile): ThunkActionFunc<XMLHttpRequest> {
+    return (dispatch) => {
+        dispatch({type: FileTypes.UPLOAD_FILES_REQUEST});
+
+        const xhr = new XMLHttpRequest();
+
+        // Step 1: Create upload session to get presigned URL
+        Client4.createUploadSession({
+            channel_id: channelId,
+            filename: name,
+            file_size: file.size,
+        }).then((session) => {
+            if (!session.presigned_url) {
+                // No presigned URL returned, fall back would need separate handling
+                // but this shouldn't happen if config is enabled and backend is S3
+                dispatch({type: FileTypes.UPLOAD_FILES_FAILURE, clientIds: [clientId], channelId, rootId});
+                onError?.('Presigned URL not available', clientId, channelId, rootId);
+                return;
+            }
+
+            // Step 2: Upload directly to storage via presigned URL
+            xhr.open('PUT', session.presigned_url, true);
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+            if (onProgress && xhr.upload) {
+                xhr.upload.onprogress = (event) => {
+                    // Cap at 95% — remaining 5% is for server-side completion
+                    const percent = Math.min(95, Math.floor((event.loaded / event.total) * 100));
+                    onProgress({clientId, name, percent, type} as FilePreviewInfo);
+                };
+            }
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    // Step 3: Notify server that upload is complete
+                    onProgress?.({clientId, name, percent: 98, type} as FilePreviewInfo);
+
+                    Client4.completePresignedUpload(session.id).then((fileInfo) => {
+                        const response = {
+                            file_infos: [fileInfo],
+                            client_ids: [clientId],
+                        };
+
+                        const data = [{...fileInfo, clientId}];
+
+                        dispatch(batchActions([
+                            {type: FileTypes.RECEIVED_UPLOAD_FILES, data, channelId, rootId},
+                            {type: FileTypes.UPLOAD_FILES_SUCCESS},
+                        ]));
+
+                        onSuccess?.(response, channelId, rootId);
+                    }).catch((err: ServerError) => {
+                        dispatch({type: FileTypes.UPLOAD_FILES_FAILURE, clientIds: [clientId], channelId, rootId});
+                        onError?.(err.message || 'Failed to complete upload', clientId, channelId, rootId);
+                    });
+                } else {
+                    dispatch({type: FileTypes.UPLOAD_FILES_FAILURE, clientIds: [clientId], channelId, rootId});
+                    onError?.(localizeMessage({id: 'file_upload.generic_error', defaultMessage: 'There was a problem uploading your files.'}), clientId, channelId, rootId);
+                }
+            };
+
+            xhr.onerror = () => {
+                dispatch({type: FileTypes.UPLOAD_FILES_FAILURE, clientIds: [clientId], channelId, rootId});
+                onError?.(localizeMessage({id: 'file_upload.generic_error', defaultMessage: 'There was a problem uploading your files.'}), clientId, channelId, rootId);
+            };
+
+            xhr.send(file);
+        }).catch((err: ServerError) => {
+            dispatch({type: FileTypes.UPLOAD_FILES_FAILURE, clientIds: [clientId], channelId, rootId});
+            onError?.(err.message || 'Failed to create upload session', clientId, channelId, rootId);
+        });
 
         return xhr;
     };

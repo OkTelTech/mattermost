@@ -119,6 +119,24 @@ func (s *AttendanceStore) FindLeaveRequestsByUserAndDates(ctx context.Context, u
 	return results, nil
 }
 
+// FindFutureLeaveRequestsByUser returns pending or approved leave requests
+// where at least one date is >= fromDate.
+func (s *AttendanceStore) FindFutureLeaveRequestsByUser(ctx context.Context, userID string, fromDate string) ([]model.LeaveRequest, error) {
+	cursor, err := s.leave.Find(ctx, bson.M{
+		"user_id": userID,
+		"status":  bson.M{"$in": []string{string(model.LeaveStatusPending), string(model.LeaveStatusApproved)}},
+		"dates":   bson.M{"$elemMatch": bson.M{"$gte": fromDate}},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("find future leave requests: %w", err)
+	}
+	var results []model.LeaveRequest
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, fmt.Errorf("decode future leave requests: %w", err)
+	}
+	return results, nil
+}
+
 // UpdateLeaveRequest updates an existing leave request.
 func (s *AttendanceStore) UpdateLeaveRequest(ctx context.Context, req *model.LeaveRequest) error {
 	req.UpdatedAt = time.Now()

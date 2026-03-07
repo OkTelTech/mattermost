@@ -18,6 +18,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/shared/mlog"
 	"github.com/mattermost/mattermost/server/public/shared/request"
 	"github.com/mattermost/mattermost/server/v8/channels/store"
+	"github.com/mattermost/mattermost/server/v8/platform/shared/filestore"
 )
 
 const minFirstPartSize = 5 * 1024 * 1024 // 5MB
@@ -159,6 +160,18 @@ func (a *App) CreateUploadSession(rctx request.CTX, us *model.UploadSession) (*m
 	us, storeErr := a.Srv().Store().UploadSession().Save(us)
 	if storeErr != nil {
 		return nil, model.NewAppError("CreateUploadSession", "app.upload.create.save.app_error", nil, "", http.StatusInternalServerError).Wrap(storeErr)
+	}
+
+	// Generate presigned PUT URL if enabled and using S3 backend
+	if us.Type == model.UploadTypeAttachment && a.Config().FileSettings.EnablePresignedFileUploads != nil && *a.Config().FileSettings.EnablePresignedFileUploads {
+		if backend, ok := a.Srv().FileBackend().(filestore.FileBackendWithUploadLinkGenerator); ok {
+			expiry := time.Duration(*a.Config().FileSettings.AmazonS3PresignExpiresSeconds) * time.Second
+			if link, err := backend.GeneratePresignedPutLink(us.Path, expiry); err == nil {
+				us.PresignedURL = link
+			} else {
+				rctx.Logger().Warn("Failed to generate presigned upload URL, falling back to server upload", mlog.Err(err))
+			}
+		}
 	}
 
 	return us, nil
@@ -346,6 +359,95 @@ func (a *App) UploadData(rctx request.CTX, us *model.UploadSession, rd io.Reader
 	}
 
 	// delete upload session
+	if storeErr := a.Srv().Store().UploadSession().Delete(us.Id); storeErr != nil {
+		rctx.Logger().Warn("Failed to delete UploadSession", mlog.Err(storeErr))
+	}
+
+	return info, nil
+}
+
+// CompletePresignedUpload finalizes a presigned upload after the client has uploaded
+// the file directly to the storage backend. It verifies the file exists, generates
+// FileInfo, runs image processing, and saves to DB.
+func (a *App) CompletePresignedUpload(rctx request.CTX, us *model.UploadSession) (*model.FileInfo, *model.AppError) {
+	// Verify the file exists in storage
+	exists, err := a.FileExists(us.Path)
+	if err != nil {
+		return nil, model.NewAppError("CompletePresignedUpload", "app.upload.complete_presigned.file_check.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
+	}
+	if !exists {
+		return nil, model.NewAppError("CompletePresignedUpload", "app.upload.complete_presigned.file_not_found.app_error", nil, "", http.StatusBadRequest)
+	}
+
+	// Verify file size
+	size, sizeErr := a.FileSize(us.Path)
+	if sizeErr != nil {
+		return nil, model.NewAppError("CompletePresignedUpload", "app.upload.complete_presigned.file_size.app_error", nil, "", http.StatusInternalServerError).Wrap(sizeErr)
+	}
+	if size != us.FileSize {
+		// Update with actual size if different (client may not know exact size for some file types)
+		us.FileSize = size
+	}
+
+	// Read the file to generate FileInfo
+	file, appErr := a.FileReader(us.Path)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	info, genErr := a.genFileInfoFromReader(us.Filename, file, us.FileSize)
+	file.Close()
+	if genErr != nil {
+		return nil, model.NewAppError("CompletePresignedUpload", "app.upload.complete_presigned.gen_info.app_error", nil, "", http.StatusInternalServerError).Wrap(genErr)
+	}
+
+	info.CreatorId = us.UserId
+	info.ChannelId = us.ChannelId
+	info.Path = us.Path
+	info.RemoteId = model.NewPointer(us.RemoteId)
+	if us.ReqFileId != "" {
+		info.Id = us.ReqFileId
+	}
+
+	// Image post-processing (thumbnail, preview, mini preview)
+	if info.IsImage() && !info.IsSvg() {
+		if limitErr := checkImageResolutionLimit(info.Width, info.Height, *a.Config().FileSettings.MaxImageResolution); limitErr != nil {
+			return nil, model.NewAppError("CompletePresignedUpload", "app.upload.complete_presigned.large_image.app_error",
+				map[string]any{"Filename": us.Filename, "Width": info.Width, "Height": info.Height}, "", http.StatusBadRequest)
+		}
+
+		nameWithoutExtension := info.Name[:strings.LastIndex(info.Name, ".")]
+		info.PreviewPath = filepath.Dir(info.Path) + "/" + nameWithoutExtension + "_preview." + getFileExtFromMimeType(info.MimeType)
+		info.ThumbnailPath = filepath.Dir(info.Path) + "/" + nameWithoutExtension + "_thumb." + getFileExtFromMimeType(info.MimeType)
+		imgData, fileErr := a.ReadFile(us.Path)
+		if fileErr != nil {
+			return nil, fileErr
+		}
+		a.HandleImages(rctx, []string{info.PreviewPath}, []string{info.ThumbnailPath}, [][]byte{imgData})
+	}
+
+	// Save FileInfo to DB
+	var storeErr error
+	if info, storeErr = a.Srv().Store().FileInfo().Save(rctx, info); storeErr != nil {
+		var appError *model.AppError
+		switch {
+		case errors.As(storeErr, &appError):
+			return nil, appError
+		default:
+			return nil, model.NewAppError("CompletePresignedUpload", "app.upload.complete_presigned.save.app_error", nil, "", http.StatusInternalServerError).Wrap(storeErr)
+		}
+	}
+
+	if *a.Config().FileSettings.ExtractContent {
+		infoCopy := *info
+		a.Srv().Go(func() {
+			if err := a.ExtractContentFromFileInfo(rctx, &infoCopy); err != nil {
+				rctx.Logger().Error("Failed to extract file content", mlog.Err(err), mlog.String("fileInfoId", infoCopy.Id))
+			}
+		})
+	}
+
+	// Delete upload session
 	if storeErr := a.Srv().Store().UploadSession().Delete(us.Id); storeErr != nil {
 		rctx.Logger().Warn("Failed to delete UploadSession", mlog.Err(storeErr))
 	}

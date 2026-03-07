@@ -45,6 +45,8 @@ type UploadSession struct {
 	RemoteId string `json:"remote_id"`
 	// Requested file id if uploading for shared channel
 	ReqFileId string `json:"req_file_id"`
+	// Presigned URL for direct upload to storage (not persisted to DB).
+	PresignedURL string `json:"presigned_url,omitempty" db:"-"`
 }
 
 func (us *UploadSession) Auditable() map[string]any {

@@ -2623,6 +2623,20 @@ export default class Client4 {
         );
     };
 
+    createUploadSession = (session: {channel_id: string; filename: string; file_size: number}) => {
+        return this.doFetch<{id: string; presigned_url?: string; file_offset: number; file_size: number}>(
+            `${this.getBaseRoute()}/uploads`,
+            {method: 'post', body: JSON.stringify(session)},
+        );
+    };
+
+    completePresignedUpload = (uploadId: string) => {
+        return this.doFetch<FileInfo>(
+            `${this.getBaseRoute()}/uploads/${uploadId}/complete`,
+            {method: 'post'},
+        );
+    };
+
     getFilePublicLink = (fileId: string) => {
         return this.doFetch<{
             link: string;

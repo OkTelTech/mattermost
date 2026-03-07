@@ -589,6 +589,22 @@ func GeneratePublicLinkHash(fileID, salt string) string {
 	return base64.RawURLEncoding.EncodeToString(hash.Sum(nil))
 }
 
+// GeneratePresignedGetURL returns a presigned download URL for the given file path.
+// Returns an error if the backend does not support presigned URLs (e.g. local storage).
+func (a *App) GeneratePresignedGetURL(path string) (string, *model.AppError) {
+	backend, ok := a.Srv().FileBackend().(filestore.FileBackendWithLinkGenerator)
+	if !ok {
+		return "", model.NewAppError("GeneratePresignedGetURL", "app.file.presigned_url.not_supported.app_error", nil, "", http.StatusNotImplemented)
+	}
+
+	link, _, err := backend.GeneratePublicLink(path)
+	if err != nil {
+		return "", model.NewAppError("GeneratePresignedGetURL", "app.file.presigned_url.generate.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
+	}
+
+	return link, nil
+}
+
 // UploadFile uploads a single file in form of a completely constructed byte array for a channel.
 func (a *App) UploadFile(rctx request.CTX, data []byte, channelID string, filename string) (*model.FileInfo, *model.AppError) {
 	return a.UploadFileForUserAndTeam(rctx, data, channelID, filename, "", "")

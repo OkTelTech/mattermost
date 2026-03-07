@@ -47,6 +47,10 @@ type FileBackendWithLinkGenerator interface {
 	GeneratePublicLink(path string) (string, time.Duration, error)
 }
 
+type FileBackendWithUploadLinkGenerator interface {
+	GeneratePresignedPutLink(path string, expiry time.Duration) (string, error)
+}
+
 type FileBackendSettings struct {
 	DriverName                         string
 	Directory                          string
@@ -87,6 +91,7 @@ func NewFileBackendSettingsFromConfig(fileSettings *model.FileSettings, enableCo
 		AmazonS3SSE:                        fileSettings.AmazonS3SSE != nil && *fileSettings.AmazonS3SSE && enableComplianceFeature,
 		AmazonS3Trace:                      fileSettings.AmazonS3Trace != nil && *fileSettings.AmazonS3Trace,
 		AmazonS3RequestTimeoutMilliseconds: *fileSettings.AmazonS3RequestTimeoutMilliseconds,
+		AmazonS3PresignExpiresSeconds:      *fileSettings.AmazonS3PresignExpiresSeconds,
 		SkipVerify:                         skipVerify,
 		AmazonS3UploadPartSizeBytes:        *fileSettings.AmazonS3UploadPartSizeBytes,
 		AmazonS3StorageClass:               *fileSettings.AmazonS3StorageClass,

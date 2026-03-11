@@ -104,7 +104,7 @@ const PostMessagePreview = (props: Props) => {
                 {previewFooterMessage || (
                     <FormattedMessage
                         id='post_message_preview.channel'
-                        defaultMessage='Only visible to users in ~{channel}'
+                        defaultMessage='Originally posted in ~{channel}'
                         values={{
                             channel: channelDisplayName,
                         }}

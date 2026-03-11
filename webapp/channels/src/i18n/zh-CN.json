@@ -5411,7 +5411,7 @@
   "post_info.tooltip.add_reactions": "添加反应",
   "post_info.unpin": "从频道取消标注",
   "post_info.unread": "标为未读",
-  "post_message_preview.channel": "只对 ~{channel} 中的用户可见",
+  "post_message_preview.channel": "最初发布在 ~{channel}",
   "post_message_view.edited": "已编辑",
   "post_message_view.view_post_edit_history": "点击查看历史记录",
   "post_pre_header.flagged": "已保存",

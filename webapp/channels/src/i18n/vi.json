@@ -3836,7 +3836,7 @@
   "post_info.tooltip.add_reactions": "Thêm phản ứng",
   "post_info.unpin": "Bỏ ghim khỏi Kênh",
   "post_info.unread": "Đánh dấu là Chưa đọc",
-  "post_message_preview.channel": "Chỉ hiển thị với người dùng trong ~{channel}",
+  "post_message_preview.channel": "Được đăng trong ~{channel}",
   "post_message_view.edited": "(đã chỉnh sửa)",
   "post_message_view.view_post_edit_history": "Bấm để xem lịch sử",
   "post_pre_header.flagged": "Đã lưu",

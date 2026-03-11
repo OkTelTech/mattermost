@@ -4590,7 +4590,7 @@
   "post_info.tooltip.add_reactions": "新增反應",
   "post_info.unpin": "解除釘選",
   "post_info.unread": "標為未讀",
-  "post_message_preview.channel": "只對 ~{channel} 的使用者可見",
+  "post_message_preview.channel": "最初發佈在 ~{channel}",
   "post_message_view.edited": "已編輯",
   "post_message_view.view_post_edit_history": "按一下以檢視紀錄",
   "post_pre_header.flagged": "已儲存",

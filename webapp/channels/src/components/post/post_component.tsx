@@ -838,8 +838,8 @@ function PostComponent(props: Props) {
                                 )}
                                 {showReactions && <ReactionList post={post}/>}
                             </div>
-                            {threadFooter}
                         </div>
+                        {threadFooter}
                     </div>
                 </div>
             </PostAriaLabelDiv>

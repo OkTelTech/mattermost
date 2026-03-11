@@ -164,8 +164,14 @@ func (h *permalinkBroadcastHook) Process(msg *platform.HookedWebSocketEvent, web
 		return errors.Wrap(err, "Invalid preview_channel value passed to permalinkBroadcastHook")
 	}
 
+	// Check if the user who posted the permalink (the forwarder) has access to the referenced channel.
+	authorID, err := getTypedArg[string](args, "author_id")
+	if err != nil {
+		return errors.Wrap(err, "Invalid author_id value passed to permalinkBroadcastHook")
+	}
+
 	rctx := request.EmptyContext(webConn.Platform.Log())
-	if !webConn.Suite.HasPermissionToReadChannel(rctx, webConn.UserId, previewChannel) {
+	if !webConn.Suite.HasPermissionToReadChannel(rctx, authorID, previewChannel) {
 		// Do nothing.
 		// In this case, the sanitized post is already attached to the ws event.
 		return nil

@@ -252,7 +252,10 @@ func (a *App) sanitizePostMetadataForUserAndChannel(rctx request.CTX, post *mode
 		return post
 	}
 
-	if previewedChannel != nil && !a.HasPermissionToReadChannel(rctx, userID, previewedChannel) {
+	// Check if the user who posted the permalink (the forwarder) has access to the referenced channel.
+	// If they do, they intentionally shared the content, so keep the embed visible to all readers.
+	// If they don't, strip the embed to prevent unauthorized content exposure.
+	if previewedChannel != nil && !a.HasPermissionToReadChannel(rctx, post.UserId, previewedChannel) {
 		removePermalinkMetadataFromPost(post)
 	}
 
@@ -274,7 +277,10 @@ func (a *App) SanitizePostMetadataForUser(rctx request.CTX, post *model.Post, us
 		return nil, err
 	}
 
-	if previewedChannel != nil && !a.HasPermissionToReadChannel(rctx, userID, previewedChannel) {
+	// Check if the user who posted the permalink (the forwarder) has access to the referenced channel.
+	// If they do, they intentionally shared the content, so keep the embed visible to all readers.
+	// If they don't, strip the embed to prevent unauthorized content exposure.
+	if previewedChannel != nil && !a.HasPermissionToReadChannel(rctx, post.UserId, previewedChannel) {
 		removePermalinkMetadataFromPost(post)
 	}
 

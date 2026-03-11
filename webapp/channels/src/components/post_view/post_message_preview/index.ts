@@ -8,7 +8,7 @@ import type {Dispatch} from 'redux';
 import type {PostPreviewMetadata} from '@mattermost/types/posts';
 
 import {General} from 'mattermost-redux/constants';
-import {makeGetChannel} from 'mattermost-redux/selectors/entities/channels';
+import {makeGetChannel, getMyChannelMembership} from 'mattermost-redux/selectors/entities/channels';
 import {getConfig} from 'mattermost-redux/selectors/entities/general';
 import {getPost, isPostPriorityEnabled} from 'mattermost-redux/selectors/entities/posts';
 import {get} from 'mattermost-redux/selectors/entities/preferences';
@@ -53,6 +53,11 @@ function makeMapStateToProps() {
             channelDisplayName = getChannel(state, ownProps.metadata.channel_id)?.display_name || '';
         }
 
+        // For private channels and DMs/GMs, prevent click-through if user is not a member
+        const isPrivateSource = ownProps.metadata.channel_type !== General.OPEN_CHANNEL;
+        const isMemberOfSourceChannel = Boolean(getMyChannelMembership(state, ownProps.metadata.channel_id));
+        const shouldPreventClick = ownProps.preventClickAction || (isPrivateSource && !isMemberOfSourceChannel);
+
         return {
             currentTeamUrl,
             channelDisplayName,
@@ -63,6 +68,7 @@ function makeMapStateToProps() {
             isEmbedVisible: embedVisible,
             compactDisplay: get(state, Preferences.CATEGORY_DISPLAY_SETTINGS, Preferences.MESSAGE_DISPLAY, Preferences.MESSAGE_DISPLAY_DEFAULT) === Preferences.MESSAGE_DISPLAY_COMPACT,
             isPostPriorityEnabled: isPostPriorityEnabled(state),
+            preventClickAction: shouldPreventClick,
         };
     };
 }

@@ -71,9 +71,7 @@
         &.other--root {
             padding-top: 16px;
 
-            .post__body {
-                background: transparent !important;
-            }
+            // Removed background override for bubble style
 
             &.post--compact {
                 padding-left: 1em;
@@ -102,17 +100,12 @@
             padding: 0 10px 0 0;
         }
 
-        .post__body {
-            width: 100%;
-            padding-left: 0;
-        }
+        // Removed width and padding overrides for bubble style
 
         &.post--compact {
             padding-left: 1em;
 
-            .post__body {
-                padding-left: 0;
-            }
+            // Removed padding override for bubble style
 
             &.same--root {
                 &.post--comment {

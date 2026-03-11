@@ -671,10 +671,6 @@
         .permalink-icon {
             visibility: visible;
         }
-
-        .post__body {
-            background: transparent !important;
-        }
     }
 
     &.post--hide-controls {
@@ -1388,8 +1384,12 @@
     }
 
     .post__body {
-        width: 100%;
-        padding: 0 0 0.2em;
+        width: fit-content;
+        max-width: 100%;
+        background-color: rgba(var(--center-channel-color-rgb), 0.08); /* Other user/System message */
+        border-radius: 16px;
+        padding: 8px 12px;
+        margin-top: 4px;
         word-wrap: break-word;
 
         &-reactions-acks {
@@ -2228,6 +2228,19 @@
 }
 
 .post.current--user {
+    .post__body {
+        background-color: var(--center-channel-bg); /* Own message background */
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16); /* Own message border */
+        
+        &.post--media-only {
+            background-color: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+        }
+    }
+
+
     &.other--root,
     &.post--root {
         .post__header-set-custom-status {

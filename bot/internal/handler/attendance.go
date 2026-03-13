@@ -12,18 +12,20 @@ import (
 	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
+	"oktel-bot/internal/scheduler"
 	"oktel-bot/internal/service"
 )
 
 type AttendanceHandler struct {
-	svc         *service.AttendanceService
-	mm          *mattermost.Client
-	botURL      string
-	blockMobile bool
+	svc             *service.AttendanceService
+	mm              *mattermost.Client
+	botURL          string
+	blockMobile     bool
+	activityChecker *scheduler.ActivityChecker
 }
 
-func NewAttendanceHandler(svc *service.AttendanceService, mm *mattermost.Client, botURL string, blockMobile bool) *AttendanceHandler {
-	return &AttendanceHandler{svc: svc, mm: mm, botURL: botURL, blockMobile: blockMobile}
+func NewAttendanceHandler(svc *service.AttendanceService, mm *mattermost.Client, botURL string, blockMobile bool, activityChecker *scheduler.ActivityChecker) *AttendanceHandler {
+	return &AttendanceHandler{svc: svc, mm: mm, botURL: botURL, blockMobile: blockMobile, activityChecker: activityChecker}
 }
 
 // isMobileRequest checks the X-Mattermost-Is-Mobile header injected by the Mattermost server.
@@ -1205,6 +1207,42 @@ func (h *AttendanceHandler) HandleStats(w http.ResponseWriter, r *http.Request) 
 }
 
 // RegisterRoutes registers all attendance routes on the given mux.
+// HandleActivityConfirm handles the confirm button click from activity check DMs.
+func (h *AttendanceHandler) HandleActivityConfirm(w http.ResponseWriter, r *http.Request) {
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.localeCtx(r.Context(), req.UserID)
+
+	if h.isMobileRequest(r) {
+		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "activity.check.mobile_blocked")})
+		return
+	}
+
+	result := h.activityChecker.HandleConfirm(ctx, req.UserID)
+	switch result {
+	case "confirmed":
+		writeJSON(w, ActionResponse{
+			Update: &ActionUpdate{
+				Message: i18n.T(ctx, "activity.check.dm.confirmed"),
+				Props:   &mattermost.Props{Attachments: []mattermost.Attachment{}},
+			},
+		})
+	case "expired":
+		writeJSON(w, ActionResponse{
+			Update: &ActionUpdate{
+				Message: i18n.T(ctx, "activity.check.dm.expired"),
+				Props:   &mattermost.Props{Attachments: []mattermost.Attachment{}},
+			},
+		})
+	default:
+		writeJSON(w, ActionResponse{})
+	}
+}
+
 func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/diemdanh", h.HandleDiemDanh)
 	mux.HandleFunc("POST /api/xinphep", h.HandleXinPhep)
@@ -1228,6 +1266,7 @@ func (h *AttendanceHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/attendance/change-approve", h.HandleChangeApprove)
 	mux.HandleFunc("POST /api/attendance/change-reject", h.HandleChangeReject)
 	mux.HandleFunc("POST /api/attendance/change-reject-submit", h.HandleChangeRejectSubmit)
+	mux.HandleFunc("POST /api/attendance/activity-confirm", h.HandleActivityConfirm)
 	mux.HandleFunc("GET /api/attendance/report", h.HandleReport)
 	mux.HandleFunc("GET /api/attendance/stats", h.HandleStats)
 }

@@ -145,6 +145,10 @@ services:
       # Tokens will be set after creating bot accounts in Mattermost
       ATTENDANCE_BOT_TOKEN: "${ATTENDANCE_BOT_TOKEN:-}"
       BUDGET_BOT_TOKEN: "${BUDGET_BOT_TOKEN:-}"
+      ACTIVITY_CHECK_MIN: "60"
+      ACTIVITY_CHECK_MAX: "120"
+      ACTIVITY_CHECK_TIMEOUT: "10"
+      ACTIVITY_CHECK_INTERVAL: "300"
     ports:
       - "3000:3000"
     depends_on:

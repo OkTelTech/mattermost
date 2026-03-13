@@ -182,5 +182,13 @@
   "budget.err.already_completed": "申请已完成",
   "budget.err.already_rejected": "申请已被拒绝",
   "budget.err.been_rejected": "申请已被拒绝",
-  "budget.err.wrong_step": "申请处于第 {{.Current}} 步，预期为第 {{.Expected}} 步"
+  "budget.err.wrong_step": "申请处于第 {{.Current}} 步，预期为第 {{.Expected}} 步",
+  "activity.check.prompt": "你还在工作吗？（{{.Timeout}} 秒后过期）",
+  "activity.check.note": "_(请在电脑上确认)_",
+  "activity.check.btn.confirm": "确认",
+  "activity.check.mobile_blocked": "请在电脑上确认。",
+  "activity.check.expired": "@{{.Username}} 未确认正在工作。",
+  "activity.check.confirmed": "已确认。谢谢！",
+  "activity.check.dm.confirmed": "你已确认正在工作。 :white_check_mark:",
+  "activity.check.dm.expired": "你未确认正在工作。 :x:"
 }

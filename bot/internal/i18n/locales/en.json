@@ -181,5 +181,13 @@
   "budget.err.already_completed": "request is already completed",
   "budget.err.already_rejected": "request is already rejected",
   "budget.err.been_rejected": "request has been rejected",
-  "budget.err.wrong_step": "request is at step {{.Current}}, expected step {{.Expected}}"
+  "budget.err.wrong_step": "request is at step {{.Current}}, expected step {{.Expected}}",
+  "activity.check.prompt": "Are you still working? (Expires in {{.Timeout}} seconds)",
+  "activity.check.note": "_(Please confirm on desktop only)_",
+  "activity.check.btn.confirm": "Confirm",
+  "activity.check.mobile_blocked": "Please confirm on desktop.",
+  "activity.check.expired": "@{{.Username}} did not confirm they are working.",
+  "activity.check.confirmed": "Confirmed. Thank you!",
+  "activity.check.dm.confirmed": "You confirmed you are working. :white_check_mark:",
+  "activity.check.dm.expired": "You did not confirm you are working. :x:"
 }

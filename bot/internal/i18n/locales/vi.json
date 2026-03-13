@@ -181,5 +181,13 @@
   "budget.err.already_completed": "yêu cầu đã hoàn thành",
   "budget.err.already_rejected": "yêu cầu đã bị từ chối",
   "budget.err.been_rejected": "yêu cầu đã bị từ chối",
-  "budget.err.wrong_step": "yêu cầu đang ở bước {{.Current}}, cần ở bước {{.Expected}}"
+  "budget.err.wrong_step": "yêu cầu đang ở bước {{.Current}}, cần ở bước {{.Expected}}",
+  "activity.check.prompt": "Bạn có đang làm việc không? (Hết hạn sau {{.Timeout}} giây)",
+  "activity.check.note": "_(Vui lòng xác nhận trên máy tính)_",
+  "activity.check.btn.confirm": "Xác nhận",
+  "activity.check.mobile_blocked": "Vui lòng xác nhận trên máy tính.",
+  "activity.check.expired": "@{{.Username}} không xác nhận đang làm việc.",
+  "activity.check.confirmed": "Đã xác nhận. Cảm ơn!",
+  "activity.check.dm.confirmed": "Bạn đã xác nhận đang làm việc. :white_check_mark:",
+  "activity.check.dm.expired": "Bạn chưa xác nhận đang làm việc. :x:"
 }

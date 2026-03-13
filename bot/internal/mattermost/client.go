@@ -159,6 +159,25 @@ func (c *Client) SendDM(userID, message string) error {
 	return err
 }
 
+// SendDMPost sends a post (with attachments/buttons) as a direct message to a user.
+func (c *Client) SendDMPost(userID string, post *Post) (*Post, error) {
+	botID, err := c.getBotUserID()
+	if err != nil {
+		return nil, err
+	}
+
+	var channel struct {
+		ID string `json:"id"`
+	}
+	payload := []string{userID, botID}
+	if err := c.doJSON("POST", "/api/v4/channels/direct", payload, &channel); err != nil {
+		return nil, fmt.Errorf("create dm channel: %w", err)
+	}
+
+	post.ChannelID = channel.ID
+	return c.CreatePost(post)
+}
+
 // OpenDialog opens an interactive dialog for the user.
 func (c *Client) OpenDialog(req *DialogRequest) error {
 	return c.doJSON("POST", "/api/v4/actions/dialogs/open", req, nil)

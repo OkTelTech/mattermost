@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -27,6 +28,8 @@ import (
 const (
 	Me                             = "me"
 	UserNotifyAll                  = "all"
+	UserPropMaxMobileDevices  = "max_mobile_devices"
+	UserPropMaxDesktopDevices = "max_desktop_devices"
 	UserNotifyHere                 = "here"
 	UserNotifyMention              = "mention"
 	UserNotifyNone                 = "none"
@@ -872,6 +875,24 @@ func IsValidUserRoles(userRoles string) bool {
 // This function should not be used to check permissions.
 func (u *User) IsGuest() bool {
 	return IsInRole(u.Roles, SystemGuestRoleId)
+}
+
+func (u *User) GetMaxMobileDevices() int {
+	if v, ok := u.Props[UserPropMaxMobileDevices]; ok {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 1
+}
+
+func (u *User) GetMaxDesktopDevices() int {
+	if v, ok := u.Props[UserPropMaxDesktopDevices]; ok {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 1
 }
 
 func (u *User) IsMagicLinkEnabled() bool {

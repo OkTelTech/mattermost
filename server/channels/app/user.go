@@ -3171,3 +3171,22 @@ func (a *App) ResetPasswordFailedAttempts(rctx request.CTX, user *model.User) *m
 
 	return nil
 }
+
+func (a *App) UpdateUserDeviceLimits(rctx request.CTX, userID string, maxMobile, maxDesktop int) (*model.User, *model.AppError) {
+	user, err := a.GetUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.Props == nil {
+		user.Props = make(model.StringMap)
+	}
+	user.Props[model.UserPropMaxMobileDevices] = strconv.Itoa(maxMobile)
+	user.Props[model.UserPropMaxDesktopDevices] = strconv.Itoa(maxDesktop)
+
+	updated, err := a.UpdateUser(rctx, user, false)
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
+}

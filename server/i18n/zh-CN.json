@@ -2066,6 +2066,14 @@
     "translation": "您的帐号因被停用而登入失败。请联系系统管理员。"
   },
   {
+    "id": "api.user.login.device_limit_mobile.app_error",
+    "translation": "已达到移动设备登录上限（最多允许 {{.Limit}} 台设备）。请联系管理员增加限制或移除一台设备。"
+  },
+  {
+    "id": "api.user.login.device_limit_desktop.app_error",
+    "translation": "已达到桌面设备登录上限（最多允许 {{.Limit}} 台设备）。请联系管理员增加限制或移除一台设备。"
+  },
+  {
     "id": "api.user.login.not_verified.app_error",
     "translation": "登录失败，因为电子邮件地址没有被验证。"
   },

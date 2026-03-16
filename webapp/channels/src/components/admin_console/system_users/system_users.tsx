@@ -22,6 +22,7 @@ import {getDisplayName, imageURLForUser} from 'utils/utils';
 import type {AdminConsoleUserManagementTableProperties} from 'types/store/views';
 
 import {ColumnNames} from './constants';
+import {CreateUserButton} from './create_user_button';
 import {RevokeSessionsButton} from './revoke_sessions_button';
 import {SystemUsersColumnTogglerMenu} from './system_users_column_toggler_menu';
 import {SystemUsersDateRangeMenu} from './system_users_date_range_menu';
@@ -501,6 +502,7 @@ function SystemUsers(props: Props) {
                             currentUserId={props.currentUser.id}
                             usersLenght={userReports.length}
                         />
+                        <CreateUserButton/>
                     </div>
                     <AdminConsoleListTable<UserReport>
                         table={table}

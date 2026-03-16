@@ -14,6 +14,14 @@ const (
 	AttendanceStatusCompleted AttendanceStatus = "completed"
 )
 
+type ActivityCheckStatus string
+
+const (
+	ActivityCheckPending   ActivityCheckStatus = "pending"
+	ActivityCheckConfirmed ActivityCheckStatus = "confirmed"
+	ActivityCheckExpired   ActivityCheckStatus = "expired"
+)
+
 const (
 	AttendanceChannel         = "attendance"
 	AttendanceApprovalChannel = "attendance-approval"
@@ -50,6 +58,5 @@ type AttendanceRecord struct {
 	// Activity check fields
 	LastCheckAt     *time.Time `bson:"last_check_at,omitempty" json:"last_check_at,omitempty"`
 	LastCheckPostID string     `bson:"last_check_post_id,omitempty" json:"last_check_post_id,omitempty"`
-	LastCheckStatus string     `bson:"last_check_status,omitempty" json:"last_check_status,omitempty"` // pending, confirmed, expired
-	NextCheckAt     *time.Time `bson:"next_check_at,omitempty" json:"next_check_at,omitempty"`
+	LastCheckStatus ActivityCheckStatus `bson:"last_check_status,omitempty" json:"last_check_status,omitempty"`
 }

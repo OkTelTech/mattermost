@@ -3,7 +3,6 @@ package scheduler
 import (
 	"context"
 	"log"
-	"math/rand/v2"
 	"time"
 
 	"oktel-bot/internal/i18n"
@@ -20,20 +19,18 @@ type ActivityChecker struct {
 	store    *store.AttendanceStore
 	mm       *mattermost.Client
 	botURL   string
-	minSec   int
-	maxSec   int
+	period   time.Duration
 	timeout  time.Duration
 	interval time.Duration
 }
 
 // NewActivityChecker creates a new ActivityChecker.
-func NewActivityChecker(store *store.AttendanceStore, mm *mattermost.Client, botURL string, minSec, maxSec, timeoutSec, intervalSec int) *ActivityChecker {
+func NewActivityChecker(store *store.AttendanceStore, mm *mattermost.Client, botURL string, periodSec, timeoutSec, intervalSec int) *ActivityChecker {
 	return &ActivityChecker{
 		store:    store,
 		mm:       mm,
 		botURL:   botURL,
-		minSec:   minSec,
-		maxSec:   maxSec,
+		period:   time.Duration(periodSec) * time.Second,
 		timeout:  time.Duration(timeoutSec) * time.Second,
 		interval: time.Duration(intervalSec) * time.Second,
 	}
@@ -43,8 +40,6 @@ func NewActivityChecker(store *store.AttendanceStore, mm *mattermost.Client, bot
 func (ac *ActivityChecker) Start(ctx context.Context) {
 	ticker := time.NewTicker(ac.interval)
 	defer ticker.Stop()
-
-	log.Printf("activity checker started (interval=%s, min=%ds, max=%ds, timeout=%s)", ac.interval, ac.minSec, ac.maxSec, ac.timeout)
 
 	ac.tick(ctx)
 
@@ -74,7 +69,7 @@ func (ac *ActivityChecker) tick(ctx context.Context) {
 		}
 
 		// Handle expired pending checks
-		if rec.LastCheckStatus == "pending" && rec.LastCheckAt != nil {
+		if rec.LastCheckStatus == model.ActivityCheckPending && rec.LastCheckAt != nil {
 			if now.Sub(*rec.LastCheckAt) >= ac.timeout {
 				ac.expireCheck(ctx, rec)
 			}
@@ -83,16 +78,13 @@ func (ac *ActivityChecker) tick(ctx context.Context) {
 		}
 
 		// Determine if it's time for a new check
-		if rec.NextCheckAt == nil {
-			next := now.Add(ac.randomInterval())
-			rec.NextCheckAt = &next
-			if err := ac.store.UpdateRecord(ctx, rec); err != nil {
-				log.Printf("activity check: set initial next_check_at for %s: %v", rec.Username, err)
-			}
-			continue
+		// Use LastCheckAt as baseline, or CreatedAt if never checked
+		baseline := rec.CreatedAt
+		if rec.LastCheckAt != nil {
+			baseline = *rec.LastCheckAt
 		}
 
-		if now.Before(*rec.NextCheckAt) {
+		if now.Before(baseline.Add(ac.period)) {
 			continue
 		}
 
@@ -138,8 +130,7 @@ func (ac *ActivityChecker) sendCheck(ctx context.Context, rec *model.AttendanceR
 	now := time.Now()
 	rec.LastCheckAt = &now
 	rec.LastCheckPostID = post.ID
-	rec.LastCheckStatus = "pending"
-	rec.NextCheckAt = nil
+	rec.LastCheckStatus = model.ActivityCheckPending
 	if err := ac.store.UpdateRecord(ctx, rec); err != nil {
 		log.Printf("activity check: update record for %s: %v", rec.Username, err)
 	}
@@ -153,14 +144,11 @@ func (ac *ActivityChecker) expireCheck(ctx context.Context, rec *model.Attendanc
 		log.Printf("activity check: re-check %s: %v", rec.UserID, err)
 		return
 	}
-	if fresh == nil || fresh.Status != model.AttendanceStatusWorking || fresh.LastCheckStatus != "pending" {
+	if fresh == nil || fresh.Status != model.AttendanceStatusWorking || fresh.LastCheckStatus != model.ActivityCheckPending {
 		return
 	}
 
-	now := time.Now()
-	next := now.Add(ac.randomInterval())
-	fresh.LastCheckStatus = "expired"
-	fresh.NextCheckAt = &next
+	fresh.LastCheckStatus = model.ActivityCheckExpired
 	if err := ac.store.UpdateRecord(ctx, fresh); err != nil {
 		log.Printf("activity check: update expired for %s: %v", rec.UserID, err)
 		return
@@ -192,29 +180,25 @@ func (ac *ActivityChecker) expireCheck(ctx context.Context, rec *model.Attendanc
 
 // HandleConfirm processes a user's confirm button click.
 // Checks the DB record to determine if within timeout.
-// Returns "confirmed", "expired", or "" (no pending check).
-func (ac *ActivityChecker) HandleConfirm(ctx context.Context, userID string) string {
+func (ac *ActivityChecker) HandleConfirm(ctx context.Context, userID string) model.ActivityCheckStatus {
 	today := time.Now().In(vnTZ).Format(time.DateOnly)
 	rec, err := ac.store.GetTodayRecord(ctx, userID, today)
-	if err != nil || rec == nil || rec.LastCheckStatus != "pending" {
+	if err != nil || rec == nil || rec.LastCheckStatus != model.ActivityCheckPending {
 		return ""
 	}
 
 	now := time.Now()
-	next := now.Add(ac.randomInterval())
 
 	if rec.LastCheckAt != nil && now.Sub(*rec.LastCheckAt) <= ac.timeout {
-		rec.LastCheckStatus = "confirmed"
-		rec.NextCheckAt = &next
+		rec.LastCheckStatus = model.ActivityCheckConfirmed
 		if err := ac.store.UpdateRecord(ctx, rec); err != nil {
 			log.Printf("activity check: update confirmed for %s: %v", userID, err)
 		}
-		return "confirmed"
+		return model.ActivityCheckConfirmed
 	}
 
 	// Past timeout - expired
-	rec.LastCheckStatus = "expired"
-	rec.NextCheckAt = &next
+	rec.LastCheckStatus = model.ActivityCheckExpired
 	if err := ac.store.UpdateRecord(ctx, rec); err != nil {
 		log.Printf("activity check: update expired for %s: %v", userID, err)
 	}
@@ -234,10 +218,5 @@ func (ac *ActivityChecker) HandleConfirm(ctx context.Context, userID string) str
 		Message:   msg,
 	})
 
-	return "expired"
-}
-
-func (ac *ActivityChecker) randomInterval() time.Duration {
-	n := ac.minSec + rand.IntN(ac.maxSec-ac.minSec+1)
-	return time.Duration(n) * time.Second
+	return model.ActivityCheckExpired
 }

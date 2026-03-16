@@ -1224,14 +1224,14 @@ func (h *AttendanceHandler) HandleActivityConfirm(w http.ResponseWriter, r *http
 
 	result := h.activityChecker.HandleConfirm(ctx, req.UserID)
 	switch result {
-	case "confirmed":
+	case model.ActivityCheckConfirmed:
 		writeJSON(w, ActionResponse{
 			Update: &ActionUpdate{
 				Message: i18n.T(ctx, "activity.check.dm.confirmed"),
 				Props:   &mattermost.Props{Attachments: []mattermost.Attachment{}},
 			},
 		})
-	case "expired":
+	case model.ActivityCheckExpired:
 		writeJSON(w, ActionResponse{
 			Update: &ActionUpdate{
 				Message: i18n.T(ctx, "activity.check.dm.expired"),

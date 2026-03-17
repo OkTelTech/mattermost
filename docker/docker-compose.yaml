@@ -148,6 +148,7 @@ services:
       ACTIVITY_CHECK_PERIOD: "600"
       ACTIVITY_CHECK_TIMEOUT: "10"
       ACTIVITY_CHECK_INTERVAL: "300"
+      ACTIVITY_CHECK_CHANNEL: "attendance-oa"
     ports:
       - "3000:3000"
     depends_on:

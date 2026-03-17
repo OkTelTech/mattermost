@@ -54,7 +54,7 @@ func main() {
 	// Activity check scheduler
 	checker := scheduler.NewActivityChecker(
 		attendanceStore, attendanceMM, botURL,
-		cfg.ActivityCheckPeriodSec, cfg.ActivityCheckTimeoutSec, cfg.ActivityCheckIntervalSec,
+		cfg.ActivityCheckPeriodSec, cfg.ActivityCheckTimeoutSec, cfg.ActivityCheckIntervalSec, cfg.ActivityCheckChannel,
 	)
 	checkerCtx, checkerCancel := context.WithCancel(mainCtx)
 	defer checkerCancel()

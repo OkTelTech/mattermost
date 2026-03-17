@@ -16,24 +16,37 @@ var vnTZ = time.FixedZone("UTC+7", 7*60*60)
 // ActivityChecker periodically DMs users who are currently working
 // to confirm they are still active. All state is stored in the attendance record.
 type ActivityChecker struct {
-	store    *store.AttendanceStore
-	mm       *mattermost.Client
-	botURL   string
-	period   time.Duration
-	timeout  time.Duration
-	interval time.Duration
+	store       *store.AttendanceStore
+	mm          *mattermost.Client
+	botURL      string
+	period      time.Duration
+	timeout     time.Duration
+	interval    time.Duration
+	channelName string
 }
 
 // NewActivityChecker creates a new ActivityChecker.
-func NewActivityChecker(store *store.AttendanceStore, mm *mattermost.Client, botURL string, periodSec, timeoutSec, intervalSec int) *ActivityChecker {
+func NewActivityChecker(store *store.AttendanceStore, mm *mattermost.Client, botURL string, periodSec, timeoutSec, intervalSec int, channelName string) *ActivityChecker {
 	return &ActivityChecker{
-		store:    store,
-		mm:       mm,
-		botURL:   botURL,
-		period:   time.Duration(periodSec) * time.Second,
-		timeout:  time.Duration(timeoutSec) * time.Second,
-		interval: time.Duration(intervalSec) * time.Second,
+		store:       store,
+		mm:          mm,
+		botURL:      botURL,
+		period:      time.Duration(periodSec) * time.Second,
+		timeout:     time.Duration(timeoutSec) * time.Second,
+		interval:    time.Duration(intervalSec) * time.Second,
+		channelName: channelName,
 	}
+}
+
+func (ac *ActivityChecker) getNotificationChannelID(teamID, fallback string) string {
+	if ac.channelName == "" {
+		return fallback
+	}
+	chID, err := ac.mm.GetChannelByName(teamID, ac.channelName)
+	if err != nil || chID == "" {
+		return fallback
+	}
+	return chID
 }
 
 // Start runs the activity check loop. It blocks until ctx is cancelled.
@@ -164,8 +177,9 @@ func (ac *ActivityChecker) expireCheck(ctx context.Context, rec *model.Attendanc
 	msg := i18n.T(lctx, "activity.check.expired", map[string]any{
 		"Username": fresh.Username,
 	})
+	notifyChID := ac.getNotificationChannelID(fresh.TeamID, fresh.ChannelID)
 	if _, err := ac.mm.CreatePost(&mattermost.Post{
-		ChannelID: fresh.ChannelID,
+		ChannelID: notifyChID,
 		Message:   msg,
 	}); err != nil {
 		log.Printf("activity check: post expiry for %s: %v", fresh.Username, err)
@@ -213,8 +227,9 @@ func (ac *ActivityChecker) HandleConfirm(ctx context.Context, userID string) mod
 	msg := i18n.T(lctx, "activity.check.expired", map[string]any{
 		"Username": rec.Username,
 	})
+	notifyChID := ac.getNotificationChannelID(rec.TeamID, rec.ChannelID)
 	ac.mm.CreatePost(&mattermost.Post{
-		ChannelID: rec.ChannelID,
+		ChannelID: notifyChID,
 		Message:   msg,
 	})
 

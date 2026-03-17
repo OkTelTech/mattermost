@@ -52,13 +52,19 @@ func main() {
 	budgetSvc := service.NewBudgetService(budgetStore, budgetMM, botURL)
 
 	// Activity check scheduler
-	checker := scheduler.NewActivityChecker(
-		attendanceStore, attendanceMM, botURL,
-		cfg.ActivityCheckPeriodSec, cfg.ActivityCheckTimeoutSec, cfg.ActivityCheckIntervalSec, cfg.ActivityCheckChannel,
-	)
-	checkerCtx, checkerCancel := context.WithCancel(mainCtx)
-	defer checkerCancel()
-	go checker.Start(checkerCtx)
+	var checker *scheduler.ActivityChecker
+	if cfg.ActivityCheckEnabled {
+		checker = scheduler.NewActivityChecker(
+			attendanceStore, attendanceMM, botURL,
+			cfg.ActivityCheckPeriodSec, cfg.ActivityCheckTimeoutSec, cfg.ActivityCheckIntervalSec, cfg.ActivityCheckChannel,
+		)
+		checkerCtx, checkerCancel := context.WithCancel(mainCtx)
+		defer checkerCancel()
+		go checker.Start(checkerCtx)
+		log.Println("Activity check scheduler started")
+	} else {
+		log.Println("Activity check scheduler disabled")
+	}
 
 	// Routes
 	mux := http.NewServeMux()

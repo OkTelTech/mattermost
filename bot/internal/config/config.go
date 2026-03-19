@@ -16,6 +16,7 @@ type Config struct {
 	AttendanceBotToken       string
 	BudgetBotToken           string
 	BlockMobile              bool
+	ActivityCheckEnabled     bool
 	ActivityCheckPeriodSec   int
 	ActivityCheckTimeoutSec  int
 	ActivityCheckIntervalSec int
@@ -33,6 +34,7 @@ func Load() *Config {
 		AttendanceBotToken:       getEnv("ATTENDANCE_BOT_TOKEN", ""),
 		BudgetBotToken:           getEnv("BUDGET_BOT_TOKEN", ""),
 		BlockMobile:              getEnv("ATTENDANCE_BLOCK_MOBILE", "true") == "true",
+		ActivityCheckEnabled:     getEnv("ACTIVITY_CHECK_ENABLED", "false") == "true",
 		ActivityCheckPeriodSec:   getEnvInt("ACTIVITY_CHECK_PERIOD", 3600),
 		ActivityCheckTimeoutSec:  getEnvInt("ACTIVITY_CHECK_TIMEOUT", 10),
 		ActivityCheckIntervalSec: getEnvInt("ACTIVITY_CHECK_INTERVAL", 300),

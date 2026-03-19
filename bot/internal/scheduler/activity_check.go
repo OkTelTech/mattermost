@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
 	"oktel-bot/internal/model"
@@ -76,6 +78,9 @@ func (ac *ActivityChecker) tick(ctx context.Context) {
 	}
 
 	now := time.Now()
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(20)
+
 	for _, rec := range records {
 		if rec.Status != model.AttendanceStatusWorking {
 			continue
@@ -84,14 +89,15 @@ func (ac *ActivityChecker) tick(ctx context.Context) {
 		// Handle expired pending checks
 		if rec.LastCheckStatus == model.ActivityCheckPending && rec.LastCheckAt != nil {
 			if now.Sub(*rec.LastCheckAt) >= ac.timeout {
-				ac.expireCheck(ctx, rec)
+				g.Go(func() error {
+					ac.expireCheck(gctx, rec)
+					return nil
+				})
 			}
-			// Still within timeout - wait
 			continue
 		}
 
 		// Determine if it's time for a new check
-		// Use LastCheckAt as baseline, or CreatedAt if never checked
 		baseline := rec.CreatedAt
 		if rec.LastCheckAt != nil {
 			baseline = *rec.LastCheckAt
@@ -101,8 +107,13 @@ func (ac *ActivityChecker) tick(ctx context.Context) {
 			continue
 		}
 
-		ac.sendCheck(ctx, rec)
+		g.Go(func() error {
+			ac.sendCheck(gctx, rec)
+			return nil
+		})
 	}
+
+	_ = g.Wait()
 }
 
 func (ac *ActivityChecker) sendCheck(ctx context.Context, rec *model.AttendanceRecord) {

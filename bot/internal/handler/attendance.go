@@ -1217,6 +1217,11 @@ func (h *AttendanceHandler) HandleActivityConfirm(w http.ResponseWriter, r *http
 
 	ctx := h.localeCtx(r.Context(), req.UserID)
 
+	if h.activityChecker == nil {
+		writeJSON(w, ActionResponse{})
+		return
+	}
+
 	if h.isMobileRequest(r) {
 		writeJSON(w, ActionResponse{EphemeralText: i18n.T(ctx, "activity.check.mobile_blocked")})
 		return

@@ -32,6 +32,7 @@ import ChannelSettingsAccessRulesTab from './channel_settings_access_rules_tab';
 import ChannelSettingsArchiveTab from './channel_settings_archive_tab';
 import ChannelSettingsConfigurationTab from './channel_settings_configuration_tab';
 import ChannelSettingsInfoTab from './channel_settings_info_tab';
+import ChannelSettingsPermissionsTab from './channel_settings_permissions_tab';
 
 import './channel_settings_modal.scss';
 
@@ -47,6 +48,7 @@ type ChannelSettingsModalProps = {
 
 enum ChannelSettingsTabs {
     INFO = 'info',
+    PERMISSIONS = 'permissions',
     ACCESS_RULES = 'access_rules',
     CONFIGURATION = 'configuration',
     ARCHIVE = 'archive',
@@ -83,6 +85,11 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
     );
 
     const channelAdminABACControlEnabled = useSelector(isChannelAccessControlEnabled);
+
+    const canManageChannelRoles = useSelector((state: GlobalState) =>
+        haveIChannelPermission(state, channel.team_id, channel.id, Permissions.MANAGE_CHANNEL_ROLES),
+    );
+    const shouldShowPermissionsTab = canManageChannelRoles && (channel.type === 'O' || channel.type === 'P');
 
     const shouldShowAccessRulesTab = channelAdminABACControlEnabled && canManageChannelAccessRules && channel.type === Constants.PRIVATE_CHANNEL && !channel.group_constrained;
 
@@ -164,6 +171,8 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
         switch (activeTab) {
         case ChannelSettingsTabs.INFO:
             return renderInfoTab();
+        case ChannelSettingsTabs.PERMISSIONS:
+            return renderPermissionsTab();
         case ChannelSettingsTabs.ACCESS_RULES:
             return renderAccessRulesTab();
         case ChannelSettingsTabs.CONFIGURATION:
@@ -178,6 +187,16 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
     const renderInfoTab = () => {
         return (
             <ChannelSettingsInfoTab
+                channel={channel}
+                setAreThereUnsavedChanges={setAreThereUnsavedChanges}
+                showTabSwitchError={showTabSwitchError}
+            />
+        );
+    };
+
+    const renderPermissionsTab = () => {
+        return (
+            <ChannelSettingsPermissionsTab
                 channel={channel}
                 setAreThereUnsavedChanges={setAreThereUnsavedChanges}
                 showTabSwitchError={showTabSwitchError}
@@ -221,6 +240,13 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
             uiName: formatMessage({id: 'channel_settings.tab.info', defaultMessage: 'Info'}),
             icon: 'icon icon-information-outline',
             iconTitle: formatMessage({id: 'generic_icons.info', defaultMessage: 'Info Icon'}),
+        },
+        {
+            name: ChannelSettingsTabs.PERMISSIONS,
+            uiName: formatMessage({id: 'channel_settings.tab.permissions', defaultMessage: 'Permissions'}),
+            icon: 'icon icon-shield-outline',
+            iconTitle: formatMessage({id: 'generic_icons.permissions', defaultMessage: 'Permissions Icon'}),
+            display: shouldShowPermissionsTab,
         },
         {
             name: ChannelSettingsTabs.ACCESS_RULES,

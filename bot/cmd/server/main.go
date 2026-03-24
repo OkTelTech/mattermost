@@ -13,6 +13,7 @@ import (
 	"oktel-bot/internal/handler"
 	"oktel-bot/internal/i18n"
 	"oktel-bot/internal/mattermost"
+	"oktel-bot/internal/scheduler"
 	"oktel-bot/internal/service"
 	"oktel-bot/internal/store"
 )
@@ -50,9 +51,24 @@ func main() {
 	attendanceSvc := service.NewAttendanceService(attendanceStore, attendanceMM, botURL)
 	budgetSvc := service.NewBudgetService(budgetStore, budgetMM, botURL)
 
+	// Activity check scheduler
+	var checker *scheduler.ActivityChecker
+	if cfg.ActivityCheckEnabled {
+		checker = scheduler.NewActivityChecker(
+			attendanceStore, attendanceMM, botURL,
+			cfg.ActivityCheckPeriodSec, cfg.ActivityCheckTimeoutSec, cfg.ActivityCheckIntervalSec, cfg.ActivityCheckChannel,
+		)
+		checkerCtx, checkerCancel := context.WithCancel(mainCtx)
+		defer checkerCancel()
+		go checker.Start(checkerCtx)
+		log.Println("Activity check scheduler started")
+	} else {
+		log.Println("Activity check scheduler disabled")
+	}
+
 	// Routes
 	mux := http.NewServeMux()
-	handler.NewAttendanceHandler(attendanceSvc, attendanceMM, botURL, cfg.BlockMobile).RegisterRoutes(mux)
+	handler.NewAttendanceHandler(attendanceSvc, attendanceMM, botURL, cfg.BlockMobile, checker).RegisterRoutes(mux)
 	handler.NewBudgetHandler(budgetSvc, budgetMM, botURL).RegisterRoutes(mux)
 
 	// Health checks

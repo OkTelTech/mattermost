@@ -38,21 +38,56 @@ const FileUploadSetting = ({
     const [error, setError] = useState('');
     const [previewUrl, setPreviewUrl] = useState('');
 
+    const compressImage = useCallback((file: File): Promise<File> => {
+        const QUALITY = 0.7;
+        return new Promise((resolve) => {
+            if (!file.type.startsWith('image/')) {
+                resolve(file);
+                return;
+            }
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.getContext('2d')!.drawImage(img, 0, 0);
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob || blob.size >= file.size) {
+                            resolve(file);
+                            return;
+                        }
+                        const name = file.name.replace(/\.[^.]+$/, '.jpg');
+                        resolve(new File([blob], name, {type: 'image/jpeg'}));
+                    },
+                    'image/jpeg',
+                    QUALITY,
+                );
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+            img.src = url;
+        });
+    }, []);
+
     const handleFileChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) {
+        const raw = e.target.files?.[0];
+        if (!raw) {
             return;
         }
 
         setError('');
         setUploading(true);
-        setFileName(file.name);
+        setFileName(raw.name);
 
         // Show preview for images
-        if (file.type.startsWith('image/')) {
-            const url = URL.createObjectURL(file);
+        if (raw.type.startsWith('image/')) {
+            const url = URL.createObjectURL(raw);
             setPreviewUrl(url);
         }
+
+        const file = await compressImage(raw);
 
         try {
             if (config.EnablePresignedFileUploads === 'true') {
@@ -111,7 +146,7 @@ const FileUploadSetting = ({
         } finally {
             setUploading(false);
         }
-    }, [channelId, id, onChange, intl, config.EnablePresignedFileUploads]);
+    }, [channelId, id, onChange, intl, config.EnablePresignedFileUploads, compressImage]);
 
     const handleRemove = useCallback(() => {
         setFileName('');

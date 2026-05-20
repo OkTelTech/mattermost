@@ -180,6 +180,36 @@ func (a *App) DoLogin(rctx request.CTX, w http.ResponseWriter, r *http.Request, 
 		session.AddProp(model.SessionPropIsGuest, "false")
 	}
 
+	// Device login limit enforcement — system admins are always allowed.
+	if !user.IsSystemAdmin() {
+		loginIsMobile := deviceID != "" || isMobile
+
+		// Clear per-user session cache so we get an accurate count after a recent logout.
+		a.ch.srv.platform.ClearUserSessionCache(user.Id)
+
+		existingSessions, sessErr := a.GetSessions(rctx, user.Id)
+		if sessErr != nil {
+			sessErr.StatusCode = http.StatusInternalServerError
+			return nil, sessErr
+		}
+		mobileCount, desktopCount := countDeviceSessions(existingSessions)
+		if loginIsMobile {
+			if mobileCount >= user.GetMaxMobileDevices() {
+				return nil, model.NewAppError("DoLogin",
+					"api.user.login.device_limit_mobile.app_error",
+					map[string]any{"Limit": user.GetMaxMobileDevices()},
+					"", http.StatusForbidden)
+			}
+		} else {
+			if desktopCount >= user.GetMaxDesktopDevices() {
+				return nil, model.NewAppError("DoLogin",
+					"api.user.login.device_limit_desktop.app_error",
+					map[string]any{"Limit": user.GetMaxDesktopDevices()},
+					"", http.StatusForbidden)
+			}
+		}
+	}
+
 	var err *model.AppError
 	if session, err = a.CreateSession(rctx, session); err != nil {
 		err.StatusCode = http.StatusInternalServerError
@@ -324,4 +354,19 @@ func GetProtocol(r *http.Request) string {
 
 func isCWSLogin(a *App, token string) bool {
 	return a.License().IsCloud() && token != ""
+}
+
+// countDeviceSessions counts active (non-expired) mobile and desktop sessions.
+func countDeviceSessions(sessions []*model.Session) (mobileCount, desktopCount int) {
+	for _, s := range sessions {
+		if s.IsExpired() {
+			continue
+		}
+		if s.IsMobileApp() {
+			mobileCount++
+		} else {
+			desktopCount++
+		}
+	}
+	return
 }

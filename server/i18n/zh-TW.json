@@ -2064,6 +2064,14 @@
     "translation": "登入失敗，您的帳號已停權。請聯絡系統管理員。"
   },
   {
+    "id": "api.user.login.device_limit_mobile.app_error",
+    "translation": "已達到行動裝置登入上限（最多允許 {{.Limit}} 台裝置）。請聯絡管理員增加限制或移除一台裝置。"
+  },
+  {
+    "id": "api.user.login.device_limit_desktop.app_error",
+    "translation": "已達到桌面裝置登入上限（最多允許 {{.Limit}} 台裝置）。請聯絡管理員增加限制或移除一台裝置。"
+  },
+  {
     "id": "api.user.login.not_verified.app_error",
     "translation": "登入失敗，電子郵件地址尚未經驗證。"
   },

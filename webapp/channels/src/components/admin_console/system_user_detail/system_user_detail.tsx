@@ -24,6 +24,7 @@ import AdminUserCard from 'components/admin_console/admin_user_card/admin_user_c
 import BlockableLink from 'components/admin_console/blockable_link';
 import ResetPasswordModal from 'components/admin_console/reset_password_modal';
 import TeamList from 'components/admin_console/system_user_detail/team_list';
+import DeviceManagement from 'components/admin_console/system_user_detail/device_management';
 import ConfirmManageUserSettingsModal from 'components/admin_console/system_users/system_users_list_actions/confirm_manage_user_settings_modal';
 import ConfirmModal from 'components/confirm_modal';
 import FormError from 'components/form_error';
@@ -931,6 +932,20 @@ export class SystemUserDetail extends PureComponent<Props, State> {
                                 />
                             )}
                         </AdminPanel>
+                        {this.state.user?.id && (
+                            <AdminPanel
+                                title={defineMessage({
+                                    id: 'admin.userManagement.userDetail.deviceManagement',
+                                    defaultMessage: 'Device Management',
+                                })}
+                                subtitle={defineMessage({
+                                    id: 'admin.userManagement.userDetail.deviceManagementSubtitle',
+                                    defaultMessage: 'Active sessions and device login limits for this user',
+                                })}
+                            >
+                                <DeviceManagement userId={this.state.user.id}/>
+                            </AdminPanel>
+                        )}
                     </div>
                 </div>
 

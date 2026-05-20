@@ -82,6 +82,10 @@ func (api *API) InitUser() {
 	api.BaseRoutes.User.Handle("/sessions/revoke/all", api.APISessionRequired(revokeAllSessionsForUser)).Methods(http.MethodPost)
 	api.BaseRoutes.Users.Handle("/sessions/revoke/all", api.APISessionRequired(revokeAllSessionsAllUsers)).Methods(http.MethodPost)
 	api.BaseRoutes.Users.Handle("/sessions/device", api.APISessionRequired(handleDeviceProps)).Methods(http.MethodPut)
+	api.BaseRoutes.User.Handle("/device_sessions", api.APISessionRequired(getUserDeviceSessions)).Methods(http.MethodGet)
+	api.BaseRoutes.User.Handle("/device_limits", api.APISessionRequired(getUserDeviceLimits)).Methods(http.MethodGet)
+	api.BaseRoutes.User.Handle("/device_limits", api.APISessionRequired(updateUserDeviceLimits)).Methods(http.MethodPut)
+
 	api.BaseRoutes.User.Handle("/audits", api.APISessionRequired(getUserAudits)).Methods(http.MethodGet)
 
 	api.BaseRoutes.User.Handle("/tokens", api.APISessionRequired(createUserAccessToken)).Methods(http.MethodPost)
@@ -1962,6 +1966,8 @@ func login(c *Context, w http.ResponseWriter, r *http.Request) {
 			"app.team.join_user_to_team.max_accounts.app_error",
 			"store.sql_user.save.max_accounts.app_error",
 			"api.user.check_user_login_attempts.too_many_ldap.app_error",
+			"api.user.login.device_limit_mobile.app_error",
+			"api.user.login.device_limit_desktop.app_error",
 		}
 
 		maskError := true

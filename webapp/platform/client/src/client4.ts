@@ -1041,6 +1041,27 @@ export default class Client4 {
         );
     };
 
+    getUserDeviceSessions = (userId: string) => {
+        return this.doFetch<Session[]>(
+            `${this.getUserRoute(userId)}/device_sessions`,
+            {method: 'get'},
+        );
+    };
+
+    getUserDeviceLimits = (userId: string) => {
+        return this.doFetch<{max_mobile_devices: number; max_desktop_devices: number}>(
+            `${this.getUserRoute(userId)}/device_limits`,
+            {method: 'get'},
+        );
+    };
+
+    updateUserDeviceLimits = (userId: string, maxMobile: number, maxDesktop: number) => {
+        return this.doFetch<{max_mobile_devices: number; max_desktop_devices: number}>(
+            `${this.getUserRoute(userId)}/device_limits`,
+            {method: 'put', body: JSON.stringify({max_mobile_devices: maxMobile, max_desktop_devices: maxDesktop})},
+        );
+    };
+
     revokeSession = (userId: string, sessionId: string) => {
         return this.doFetch<StatusOK>(
             `${this.getUserRoute(userId)}/sessions/revoke`,

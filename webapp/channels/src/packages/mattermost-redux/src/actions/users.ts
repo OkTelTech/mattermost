@@ -9,6 +9,7 @@ import {batchActions} from 'redux-batched-actions';
 import type {UserAutocomplete} from '@mattermost/types/autocomplete';
 import type {Channel} from '@mattermost/types/channels';
 import type {ServerError} from '@mattermost/types/errors';
+import type {Session} from '@mattermost/types/sessions';
 import type {UserProfile, UserStatus, GetFilteredUsersStatsOpts, UsersStats, UserCustomStatus, UserAccessToken} from '@mattermost/types/users';
 
 import {UserTypes, AdminTypes} from 'mattermost-redux/action_types';
@@ -780,6 +781,34 @@ export function getSessions(userId: string) {
             userId,
         ],
     });
+}
+
+export function getUserDeviceSessions(userId: string): ActionFuncAsync<Session[]> {
+    return async (dispatch, getState) => {
+        let data;
+        try {
+            data = await Client4.getUserDeviceSessions(userId);
+        } catch (error) {
+            forceLogoutIfNecessary(error, dispatch, getState);
+            dispatch(logError(error));
+            return {error};
+        }
+        return {data};
+    };
+}
+
+export function updateUserDeviceLimits(userId: string, maxMobile: number, maxDesktop: number): ActionFuncAsync<{max_mobile_devices: number; max_desktop_devices: number}> {
+    return async (dispatch, getState) => {
+        let data;
+        try {
+            data = await Client4.updateUserDeviceLimits(userId, maxMobile, maxDesktop);
+        } catch (error) {
+            forceLogoutIfNecessary(error, dispatch, getState);
+            dispatch(logError(error));
+            return {error};
+        }
+        return {data};
+    };
 }
 
 export function revokeSession(userId: string, sessionId: string): ActionFuncAsync {

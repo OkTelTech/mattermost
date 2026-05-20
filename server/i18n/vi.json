@@ -2526,6 +2526,14 @@
     "translation": "Đăng nhập thất bại vì tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ với quản trị viên."
   },
   {
+    "id": "api.user.login.device_limit_mobile.app_error",
+    "translation": "Đã đạt giới hạn thiết bị di động (tối đa {{.Limit}} thiết bị). Vui lòng liên hệ quản trị viên để tăng giới hạn hoặc xóa một thiết bị."
+  },
+  {
+    "id": "api.user.login.device_limit_desktop.app_error",
+    "translation": "Đã đạt giới hạn thiết bị máy tính (tối đa {{.Limit}} thiết bị). Vui lòng liên hệ quản trị viên để tăng giới hạn hoặc xóa một thiết bị."
+  },
+  {
     "id": "model.config.is_valid.ldap_sync_interval.app_error",
     "translation": "Thời gian đồng bộ không hợp lệ. Phải ít nhất một phút."
   },

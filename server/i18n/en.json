@@ -4407,6 +4407,14 @@
     "translation": "Password field must not be blank"
   },
   {
+    "id": "api.user.login.device_limit_mobile.app_error",
+    "translation": "Mobile device limit reached ({{.Limit}} device(s) allowed). Please ask your administrator to increase the limit or remove a device."
+  },
+  {
+    "id": "api.user.login.device_limit_desktop.app_error",
+    "translation": "Desktop device limit reached ({{.Limit}} device(s) allowed). Please ask your administrator to increase the limit or remove a device."
+  },
+  {
     "id": "api.user.login.bot_login_forbidden.app_error",
     "translation": "Bot login is forbidden."
   },

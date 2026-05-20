@@ -710,6 +710,15 @@ const Login = ({ onCustomizeHeader }: LoginProps) => {
                     }),
                 });
                 setHasError(true);
+            } else if (loginError.server_error_id === 'api.user.login.device_limit_mobile.app_error' ||
+                loginError.server_error_id === 'api.user.login.device_limit_desktop.app_error') {
+                setShowMfa(false);
+                setIsWaiting(false);
+                setAlertBanner({
+                    mode: 'warning',
+                    title: loginError.message,
+                });
+                setHasError(true);
             } else {
                 setShowMfa(false);
                 setIsWaiting(false);

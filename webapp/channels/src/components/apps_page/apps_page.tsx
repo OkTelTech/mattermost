@@ -16,6 +16,9 @@ import macosTerminal from 'images/macos-terminal.jpg';
 import macosTerminalCommands from 'images/macos-terminal-commands.png';
 import appsHero from 'images/apps-hero.png';
 
+import MobileInstallButton from './mobile_install_button';
+import type {MobilePlatform} from './mobile_install_button';
+
 type AppsPageProps = {
     onCustomizeHeader?: CustomizeHeaderType;
 }
@@ -25,8 +28,9 @@ type AppDownloadCard = {
     title: string;
     description: string;
     iconClasses: string[];
-    downloadUrl: string;
+    downloadUrl?: string;
     platforms: string[];
+    mobilePlatform?: MobilePlatform;
 }
 
 const AppsPage = ({ onCustomizeHeader }: AppsPageProps) => {
@@ -39,8 +43,6 @@ const AppsPage = ({ onCustomizeHeader }: AppsPageProps) => {
     const linuxDownloadLink = config?.LinuxAppDownloadLink || defaultDesktopDownloadLink;
     const macIntelDownloadLink = config?.MacosIntelAppDownloadLink || defaultDesktopDownloadLink;
     const macMDownloadLink = config?.MacosMAppDownloadLink || defaultDesktopDownloadLink;
-    const iosDownloadLink = config?.IosAppDownloadLink || 'https://oktel.io/pl/ios-app/';
-    const androidDownloadLink = config?.AndroidAppDownloadLink || 'https://oktel.io/pl/android-app/';
 
     React.useEffect(() => {
         if (onCustomizeHeader) {
@@ -88,7 +90,7 @@ const AppsPage = ({ onCustomizeHeader }: AppsPageProps) => {
             title: formatMessage({ id: 'apps_page.ios.title', defaultMessage: 'iOS' }),
             description: formatMessage({ id: 'apps_page.ios.description', defaultMessage: 'iPhone & iPad' }),
             iconClasses: ['fa fa-apple'],
-            downloadUrl: iosDownloadLink,
+            mobilePlatform: 'ios',
             platforms: ['iOS'],
         },
         {
@@ -96,7 +98,7 @@ const AppsPage = ({ onCustomizeHeader }: AppsPageProps) => {
             title: formatMessage({ id: 'apps_page.android.title', defaultMessage: 'Android' }),
             description: formatMessage({ id: 'apps_page.android.description', defaultMessage: 'Phones & tablets' }),
             iconClasses: ['fa fa-android'],
-            downloadUrl: androidDownloadLink,
+            mobilePlatform: 'android',
             platforms: ['Android'],
         },
     ];
@@ -154,14 +156,16 @@ const AppsPage = ({ onCustomizeHeader }: AppsPageProps) => {
                                 </div>
                             </div>
                             <div className='apps-page-card-actions'>
-                                <a
-                                    href={app.downloadUrl}
-                                    className='apps-page-card-button'
-                                    target='_blank'
-                                    rel='noopener noreferrer'
-                                >
-                                    {formatMessage({ id: 'apps_page.download', defaultMessage: 'Download' })}
-                                </a>
+                                {app.mobilePlatform ? <MobileInstallButton platform={app.mobilePlatform}/> : (
+                                    <a
+                                        href={app.downloadUrl}
+                                        className='apps-page-card-button'
+                                        target='_blank'
+                                        rel='noopener noreferrer'
+                                    >
+                                        {formatMessage({ id: 'apps_page.download', defaultMessage: 'Download' })}
+                                    </a>
+                                )}
                                 {(app.id === 'macos-intel' || app.id === 'macos-m') && (
                                     <button
                                         className='apps-page-card-button apps-page-card-button--secondary'

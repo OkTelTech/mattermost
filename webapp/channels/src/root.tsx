@@ -1,6 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import {initPwaInstall} from 'utils/pwa_install';
+
 // Allow overriding the path used by webpack to dynamically resolve assets. This is driven by
 // an environment variable in development, or by a window variable defined in root.html in
 // production. The window variable is updated by the server after configuring SiteURL and
@@ -15,6 +17,9 @@ __webpack_public_path__ = window.publicPath;
 // in a minimum of places, as it is preferred to leverage react-router, configured to use this
 // basename accordingly.
 window.basename = window.publicPath.substr(0, window.publicPath.length - '/static/'.length);
+
+// Must run before the lazily loaded app, or Chrome's one-off install prompt is missed.
+initPwaInstall();
 
 import('./entry');
 

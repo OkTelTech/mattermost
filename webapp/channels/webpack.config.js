@@ -200,6 +200,7 @@ var config = {
                 {from: 'src/images/purchase_alert.png', to: 'images'},
                 {from: '../node_modules/pdfjs-dist/cmaps', to: 'cmaps'},
                 {from: 'src/components/initial_loading_screen/initial_loading_screen.css', to: 'css'},
+                {from: 'src/install'}, // iOS install profile and QR code for the /apps Download buttons
             ],
         }),
 
@@ -220,6 +221,10 @@ var config = {
                 src: path.resolve('src/images/favicon/android-chrome-192x192.png'),
                 type: 'image/png',
                 sizes: '192x192',
+            }, {
+                src: path.resolve('src/images/favicon/android-chrome-512x512.png'),
+                type: 'image/png',
+                sizes: '512x512',
             }, {
                 src: path.resolve('src/images/favicon/apple-touch-icon-120x120.png'),
                 type: 'image/png',

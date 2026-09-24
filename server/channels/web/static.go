@@ -112,6 +112,14 @@ func staticFilesHandler(handler http.Handler) http.Handler {
 
 		if path.Base(r.URL.Path) == "remote_entry.js" {
 			w.Header().Set("Cache-Control", "no-cache, max-age=31556926, public")
+		} else if path.Ext(r.URL.Path) == ".mobileconfig" {
+			// The iOS install profile on /apps. Safari hands it to Settings only with this type,
+			// which Go does not know. Never cached: it embeds the site URL and icon.
+			w.Header().Set("Content-Type", "application/x-apple-aspen-config")
+			w.Header().Set("Cache-Control", "no-store")
+		} else if path.Base(r.URL.Path) == "manifest.json" {
+			// Android reads its install icons from here, under a fixed name.
+			w.Header().Set("Cache-Control", "no-cache")
 		} else {
 			w.Header().Set("Cache-Control", "max-age=31556926, public")
 		}

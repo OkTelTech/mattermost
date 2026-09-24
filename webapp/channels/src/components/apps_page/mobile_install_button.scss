@@ -1,0 +1,49 @@
+// Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+// See LICENSE.txt for license information.
+
+.mobile-install {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 8px;
+    gap: 16px;
+    text-align: center;
+
+    p {
+        margin: 0;
+    }
+
+    &__steps {
+        display: flex;
+        flex-direction: column;
+        padding-left: 20px;
+        margin: 0;
+        gap: 12px;
+        line-height: 1.5;
+        text-align: left;
+    }
+
+    &__warn {
+        padding: 12px;
+        border-radius: 8px;
+        background: rgba(var(--away-indicator-rgb), 0.12);
+        font-size: 13px;
+        text-align: left;
+    }
+
+    &__url {
+        padding: 12px;
+        border: 1px dashed rgba(var(--center-channel-color-rgb), 0.32);
+        border-radius: 8px;
+        word-break: break-all;
+    }
+
+    // Black on white, as the scanner needs.
+    &__qr {
+        width: 200px;
+        max-width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        margin: 0 auto;
+        background: #fff;
+    }
+}
